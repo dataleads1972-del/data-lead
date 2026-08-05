@@ -387,6 +387,36 @@ export type Database = {
         }
         Relationships: []
       }
+      threads_connections: {
+        Row: {
+          access_token: string
+          created_at: string
+          id: string
+          threads_user_id: string
+          updated_at: string
+          user_id: string
+          username: string
+        }
+        Insert: {
+          access_token: string
+          created_at?: string
+          id?: string
+          threads_user_id: string
+          updated_at?: string
+          user_id: string
+          username: string
+        }
+        Update: {
+          access_token?: string
+          created_at?: string
+          id?: string
+          threads_user_id?: string
+          updated_at?: string
+          user_id?: string
+          username?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

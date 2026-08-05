@@ -24,6 +24,7 @@ import { Route as AuthenticatedSearchRouteImport } from './routes/_authenticated
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
 import { Route as AuthenticatedSearchIndexRouteImport } from './routes/_authenticated/search.index'
 import { Route as AuthenticatedSearchIdRouteImport } from './routes/_authenticated/search.$id'
+import { Route as AuthThreadsCallbackRouteImport } from './routes/auth.threads.callback'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -101,10 +102,15 @@ const AuthenticatedSearchIdRoute = AuthenticatedSearchIdRouteImport.update({
   path: '/$id',
   getParentRoute: () => AuthenticatedSearchRoute,
 } as any)
+const AuthThreadsCallbackRoute = AuthThreadsCallbackRouteImport.update({
+  id: '/threads/callback',
+  path: '/threads/callback',
+  getParentRoute: () => AuthRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/auth': typeof AuthRoute
+  '/auth': typeof AuthRouteWithChildren
   '/reset-password': typeof ResetPasswordRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/directory': typeof AuthenticatedDirectoryRoute
@@ -116,11 +122,12 @@ export interface FileRoutesByFullPath {
   '/search': typeof AuthenticatedSearchRouteWithChildren
   '/settings': typeof AuthenticatedSettingsRoute
   '/search/$id': typeof AuthenticatedSearchIdRoute
+  '/auth/threads/callback': typeof AuthThreadsCallbackRoute
   '/search/': typeof AuthenticatedSearchIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/auth': typeof AuthRoute
+  '/auth': typeof AuthRouteWithChildren
   '/reset-password': typeof ResetPasswordRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/directory': typeof AuthenticatedDirectoryRoute
@@ -131,13 +138,14 @@ export interface FileRoutesByTo {
   '/results': typeof AuthenticatedResultsRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/search/$id': typeof AuthenticatedSearchIdRoute
+  '/auth/threads/callback': typeof AuthThreadsCallbackRoute
   '/search': typeof AuthenticatedSearchIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
-  '/auth': typeof AuthRoute
+  '/auth': typeof AuthRouteWithChildren
   '/reset-password': typeof ResetPasswordRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/directory': typeof AuthenticatedDirectoryRoute
@@ -149,6 +157,7 @@ export interface FileRoutesById {
   '/_authenticated/search': typeof AuthenticatedSearchRouteWithChildren
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/_authenticated/search/$id': typeof AuthenticatedSearchIdRoute
+  '/auth/threads/callback': typeof AuthThreadsCallbackRoute
   '/_authenticated/search/': typeof AuthenticatedSearchIndexRoute
 }
 export interface FileRouteTypes {
@@ -167,6 +176,7 @@ export interface FileRouteTypes {
     | '/search'
     | '/settings'
     | '/search/$id'
+    | '/auth/threads/callback'
     | '/search/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -182,6 +192,7 @@ export interface FileRouteTypes {
     | '/results'
     | '/settings'
     | '/search/$id'
+    | '/auth/threads/callback'
     | '/search'
   id:
     | '__root__'
@@ -199,13 +210,14 @@ export interface FileRouteTypes {
     | '/_authenticated/search'
     | '/_authenticated/settings'
     | '/_authenticated/search/$id'
+    | '/auth/threads/callback'
     | '/_authenticated/search/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
-  AuthRoute: typeof AuthRoute
+  AuthRoute: typeof AuthRouteWithChildren
   ResetPasswordRoute: typeof ResetPasswordRoute
 }
 
@@ -316,6 +328,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSearchIdRouteImport
       parentRoute: typeof AuthenticatedSearchRoute
     }
+    '/auth/threads/callback': {
+      id: '/auth/threads/callback'
+      path: '/threads/callback'
+      fullPath: '/auth/threads/callback'
+      preLoaderRoute: typeof AuthThreadsCallbackRouteImport
+      parentRoute: typeof AuthRoute
+    }
   }
 }
 
@@ -359,10 +378,20 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
 const AuthenticatedRouteRouteWithChildren =
   AuthenticatedRouteRoute._addFileChildren(AuthenticatedRouteRouteChildren)
 
+interface AuthRouteChildren {
+  AuthThreadsCallbackRoute: typeof AuthThreadsCallbackRoute
+}
+
+const AuthRouteChildren: AuthRouteChildren = {
+  AuthThreadsCallbackRoute: AuthThreadsCallbackRoute,
+}
+
+const AuthRouteWithChildren = AuthRoute._addFileChildren(AuthRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
-  AuthRoute: AuthRoute,
+  AuthRoute: AuthRouteWithChildren,
   ResetPasswordRoute: ResetPasswordRoute,
 }
 export const routeTree = rootRouteImport
