@@ -30,6 +30,133 @@ interface RedditPost {
   url: string;
 }
 
+function decodeHTMLEntities(text: string): string {
+  return text
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'");
+}
+
+function parseRedditRSS(xmlText: string, fallbackSubreddit: string): RedditPost[] {
+  const blocks = xmlText.split("<entry>");
+  const posts: RedditPost[] = [];
+
+  for (let i = 1; i < blocks.length; i++) {
+    const entryContent = blocks[i].split("</entry>")[0];
+    
+    const titleMatch = entryContent.match(/<title>([\s\S]*?)<\/title>/);
+    const title = titleMatch ? decodeHTMLEntities(titleMatch[1]) : "";
+    
+    const authorMatch = entryContent.match(/<author><name>([\s\S]*?)<\/name>/);
+    const rawAuthor = authorMatch ? authorMatch[1] : "";
+    const author = rawAuthor.replace(/^\/u\//i, "");
+    
+    const linkMatch = entryContent.match(/href="([^"]+)"/);
+    const permalink = linkMatch ? linkMatch[1] : "";
+    
+    const subMatch = permalink.match(/\/r\/([^\/]+)\//i) || entryContent.match(/<category term="([^\"]+)"/i);
+    const subreddit = subMatch ? subMatch[1] : fallbackSubreddit;
+
+    const updatedMatch = entryContent.match(/<updated>([\s\S]*?)<\/updated>/);
+    const createdAt = updatedMatch ? updatedMatch[1] : new Date().toISOString();
+    
+    const contentMatch = entryContent.match(/<content type="html">([\s\S]*?)<\/content>/);
+    let body = "";
+    if (contentMatch) {
+      const html = contentMatch[1];
+      const mdDivMatch = html.match(/&lt;div class="md"&gt;([\s\S]*?)&lt;\/div&gt;/);
+      let contentHtml = mdDivMatch ? mdDivMatch[1] : html;
+      
+      body = contentHtml
+        .replace(/&lt;[\s\S]*?&gt;/g, "")
+        .replace(/&amp;/g, "&")
+        .replace(/&lt;/g, "<")
+        .replace(/&gt;/g, ">")
+        .replace(/&quot;/g, '"')
+        .replace(/&#39;/g, "'")
+        .replace(/submitted by[\s\S]+/, "")
+        .trim();
+    }
+    
+    const idMatch = entryContent.match(/<id>([\s\S]*?)<\/id>/);
+    let id = "";
+    if (idMatch) {
+      const idUrl = idMatch[1];
+      const matchT3 = idUrl.match(/t3_[a-z0-9]+/i);
+      id = matchT3 ? matchT3[0] : idUrl.split("/").pop() || "";
+    }
+
+    posts.push({
+      id: id || `rss_${posts.length}`,
+      subreddit,
+      title,
+      body: body.slice(0, 500),
+      author,
+      createdAt,
+      permalink,
+      url: permalink
+    });
+  }
+
+  return posts;
+}
+
+async function fetchRedditClientFallback(queryStr: string) {
+  const trimmed = queryStr.trim();
+  let isSubreddit = false;
+  let sanitizedSub = trimmed;
+
+  if (trimmed.toLowerCase().startsWith("r/")) {
+    isSubreddit = true;
+    sanitizedSub = trimmed.substring(2).trim().replace(/\s+/g, "");
+  }
+
+  const searchType: "subreddit" | "keyword" = isSubreddit ? "subreddit" : "keyword";
+  
+  const stopWords = new Set(["a","an","the","for","is","in","at","of","to","and","or","on","with","my","our","i","you","we","me","us","need","looking"]);
+  const words = trimmed.split(/\s+/).filter(w => !stopWords.has(w.toLowerCase().replace(/[^a-z0-9]/g, "")));
+  const cleanKeyword = words.length > 0 ? words.join(" ") : trimmed;
+
+  const urls = isSubreddit
+    ? [`https://www.reddit.com/r/${sanitizedSub}/hot/.rss`, `https://www.reddit.com/r/${sanitizedSub}/.rss`]
+    : [`https://www.reddit.com/search/.rss?q=${encodeURIComponent(cleanKeyword)}&sort=new`, `https://www.reddit.com/search/.rss?q=${encodeURIComponent(trimmed)}&sort=new`];
+
+  for (const url of urls) {
+    try {
+      // Direct browser fetch
+      const res = await fetch(url);
+      if (res.ok) {
+        const xmlText = await res.text();
+        const posts = parseRedditRSS(xmlText, isSubreddit ? sanitizedSub : "search");
+        if (posts.length > 0) {
+          return { posts, searchType, query: isSubreddit ? sanitizedSub : trimmed };
+        }
+      }
+    } catch {
+      // Continue to next candidate
+    }
+
+    // CORS proxy fallback if browser CORS blocks direct fetch
+    try {
+      const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
+      const proxyRes = await fetch(proxyUrl);
+      if (proxyRes.ok) {
+        const xmlText = await proxyRes.text();
+        const posts = parseRedditRSS(xmlText, isSubreddit ? sanitizedSub : "search");
+        if (posts.length > 0) {
+          return { posts, searchType, query: isSubreddit ? sanitizedSub : trimmed };
+        }
+      }
+    } catch {
+      // Continue
+    }
+  }
+
+  throw new Error(`No posts found for "${trimmed}". Please try another keyword or subreddit.`);
+}
+
 function RedditPostsPage() {
   const [searchInput, setSearchInput] = useState("r/startups");
   const [currentQuery, setCurrentQuery] = useState("startups");
@@ -58,6 +185,7 @@ function RedditPostsPage() {
     ]);
 
     try {
+      // Step 1: Attempt Server RPC Function first
       const data = await fetchRedditSubPosts({ data: { subreddit: trimmed } });
       const fetchedPosts = data?.posts || [];
       const logs = data?.debugLog || [];
@@ -65,27 +193,47 @@ function RedditPostsPage() {
       const resQuery = data?.query || trimmed;
       
       setDebugLogs((prev) => [...logs, ...prev]);
-      setPosts(fetchedPosts);
-      setSearchType(resSearchType);
-      setCurrentQuery(resQuery);
-      setSearchInput(resSearchType === "subreddit" ? `r/${resQuery}` : trimmed);
 
-      if (fetchedPosts.length === 0) {
-        setError(`No active posts could be retrieved for "${trimmed}".`);
-        toast.info(`No posts found for "${trimmed}"`);
-      } else {
+      if (fetchedPosts.length > 0) {
+        setPosts(fetchedPosts);
+        setSearchType(resSearchType);
+        setCurrentQuery(resQuery);
+        setSearchInput(resSearchType === "subreddit" ? `r/${resQuery}` : trimmed);
         toast.success(`Loaded ${fetchedPosts.length} posts for "${trimmed}"`);
+        setLoading(false);
+        return;
       }
-    } catch (err: any) {
-      console.error("Client load error:", err);
-      const msg = err.message || "Reddit request failed.";
-      setError(msg);
-      setPosts([]);
+
+      // Step 2: If server returned 0 posts or got rate limited on Vercel cloud IP, run Client Browser Fallback
       setDebugLogs((prev) => [
-        `[${new Date().toLocaleTimeString()}] Client Exception: ${msg}`,
+        `[${new Date().toLocaleTimeString()}] Server returned 0 posts or rate limited. Running browser client fallback...`,
         ...prev
       ]);
-      toast.error(msg);
+      const clientResult = await fetchRedditClientFallback(trimmed);
+      setPosts(clientResult.posts);
+      setSearchType(clientResult.searchType);
+      setCurrentQuery(clientResult.query);
+      setSearchInput(clientResult.searchType === "subreddit" ? `r/${clientResult.query}` : trimmed);
+      toast.success(`Loaded ${clientResult.posts.length} posts for "${trimmed}"`);
+    } catch (err: any) {
+      console.warn("Server RPC failed, trying client fallback:", err);
+      try {
+        const clientResult = await fetchRedditClientFallback(trimmed);
+        setPosts(clientResult.posts);
+        setSearchType(clientResult.searchType);
+        setCurrentQuery(clientResult.query);
+        setSearchInput(clientResult.searchType === "subreddit" ? `r/${clientResult.query}` : trimmed);
+        toast.success(`Loaded ${clientResult.posts.length} posts for "${trimmed}"`);
+      } catch (fallbackErr: any) {
+        const msg = fallbackErr.message || "Reddit request failed.";
+        setError(msg);
+        setPosts([]);
+        setDebugLogs((prev) => [
+          `[${new Date().toLocaleTimeString()}] Exception: ${msg}`,
+          ...prev
+        ]);
+        toast.error(msg);
+      }
     } finally {
       setLoading(false);
     }
@@ -332,7 +480,7 @@ function RedditPostsPage() {
                   </p>
                 )}
                 <div className="flex items-center justify-between pt-2 border-t border-border/30 text-xs">
-                  <div className="flex items-center gap-3 text-muted-foreground">
+                  <div className="flex items-[#888] gap-3 text-muted-foreground">
                     {post.createdAt && (
                       <span>{new Date(post.createdAt).toLocaleDateString()}</span>
                     )}
