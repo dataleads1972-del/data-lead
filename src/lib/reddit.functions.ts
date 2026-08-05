@@ -74,7 +74,7 @@ function parseRedditRSS(xmlText: string, fallbackSubreddit: string) {
   return posts;
 }
 
-function parseRSS2JSON(data: any, subreddit: string) {
+function parseRSS2JSON(data: any, fallbackSubreddit: string) {
   const items = data?.items || [];
   return items.map((item: any, i: number) => {
     let body = item.content || item.description || "";
@@ -90,6 +90,10 @@ function parseRSS2JSON(data: any, subreddit: string) {
     const rawAuthor = item.author || "";
     const author = rawAuthor.replace(/^\/u\//i, "");
 
+    const permalink = item.link || "";
+    const subMatch = permalink.match(/\/r\/([^\/]+)\//i);
+    const subreddit = subMatch ? subMatch[1] : fallbackSubreddit;
+
     return {
       id: item.guid || `rss2json_${i}`,
       subreddit,
@@ -97,8 +101,8 @@ function parseRSS2JSON(data: any, subreddit: string) {
       body: body.slice(0, 500),
       author,
       createdAt: item.pubDate || new Date().toISOString(),
-      permalink: item.link || "",
-      url: item.link || ""
+      permalink,
+      url: permalink
     };
   });
 }
@@ -121,6 +125,28 @@ const rssCache = new Map<string, CacheEntry>();
 const CACHE_TTL_MS = 60 * 1000;
 
 const USER_AGENT = "script:questly-ai-leads:v1.0.0 (by /u/datalead)";
+
+const stopWords = new Set([
+  "a","an","the","for","is","in","at","of","to","and","or","on","with",
+  "my","our","i","you","we","me","us","be","have","has","had","do","does",
+  "did","would","should","could","please","want","any","some"
+]);
+
+function extractSearchTerms(rawQuery: string): string[] {
+  const words = rawQuery.trim().split(/\s+/);
+  const filtered = words.filter(w => !stopWords.has(w.toLowerCase().replace(/[^a-z0-9]/g, "")));
+  const terms: string[] = [];
+
+  if (filtered.length > 0) {
+    terms.push(filtered.join(" "));
+  }
+  if (filtered.length > 1) {
+    terms.push(filtered[filtered.length - 1]);
+  }
+  terms.push(rawQuery);
+
+  return [...new Set(terms)];
+}
 
 export const fetchRedditSubPosts = createServerFn({ method: "GET" })
   .validator((d: unknown) =>
@@ -164,101 +190,93 @@ export const fetchRedditSubPosts = createServerFn({ method: "GET" })
 
     debugLog.push(`[${new Date().toLocaleTimeString()}] Cache MISS. Executing ${searchType} search for: "${rawQuery}"`);
 
-    // Build target subreddits to fetch
-    const subCandidates: string[] = [];
+    // MODE 1: Subreddit Feed Search (e.g. r/startups, r/hotels, r/SaaS)
     if (isSubreddit) {
-      subCandidates.push(sanitizedSub);
-    } else {
-      const cleanWord = rawQuery.replace(/[^a-z0-9]/gi, "").toLowerCase();
-      if (cleanWord && cleanWord.length > 2) {
-        subCandidates.push(cleanWord);
+      const targetSub = sanitizedSub.toLowerCase();
+      const rssUrls = [
+        `https://www.reddit.com/r/${targetSub}/hot.rss`,
+        `https://www.reddit.com/r/${targetSub}/.rss`
+      ];
+
+      for (const rssUrl of rssUrls) {
+        try {
+          debugLog.push(`[${new Date().toLocaleTimeString()}] Fetching Subreddit RSS: ${rssUrl}`);
+          const res = await fetch(rssUrl, { headers: { "User-Agent": USER_AGENT } });
+          if (res.ok) {
+            const xmlText = await res.text();
+            const posts = parseRedditRSS(xmlText, targetSub);
+            if (posts.length > 0) {
+              rssCache.set(cacheKey, { posts, timestamp: Date.now(), searchType });
+              return { posts, debugLog, status: 200, searchType, query: targetSub };
+            }
+          }
+        } catch {}
+
+        // RSS Bridge Fallback for Subreddit
+        try {
+          const bridgeUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rssUrl)}`;
+          const bridgeRes = await fetch(bridgeUrl);
+          if (bridgeRes.ok) {
+            const json = await bridgeRes.json();
+            if (json.status === "ok" && json.items && json.items.length > 0) {
+              const posts = parseRSS2JSON(json, targetSub);
+              if (posts.length > 0) {
+                rssCache.set(cacheKey, { posts, timestamp: Date.now(), searchType });
+                return { posts, debugLog, status: 200, searchType, query: targetSub };
+              }
+            }
+          }
+        } catch {}
       }
-      subCandidates.push("startups");
-      subCandidates.push("SaaS");
-      subCandidates.push("webdev");
+
+      return { posts: [], debugLog, status: 404, searchType: "subreddit", query: sanitizedSub };
     }
 
-    let lastError = "";
+    // MODE 2: Global Keyword Intent Search (e.g. "box", "hotel", "looking for a developer")
+    const searchTerms = extractSearchTerms(rawQuery);
+    debugLog.push(`[${new Date().toLocaleTimeString()}] Keyword terms to search: ${searchTerms.join(", ")}`);
 
-    // Step 1: Direct RSS Fetch
-    for (const sub of subCandidates) {
-      const rssUrl = `https://www.reddit.com/r/${sub}/hot.rss`;
+    for (const term of searchTerms) {
+      const searchRssUrl = `https://www.reddit.com/search.rss?q=${encodeURIComponent(term)}&sort=new`;
+      
+      // Attempt 1: Direct Search RSS
       try {
-        debugLog.push(`[${new Date().toLocaleTimeString()}] Direct Fetching URL: ${rssUrl}`);
-        const res = await fetch(rssUrl, {
-          headers: {
-            "User-Agent": USER_AGENT,
-            "Accept": "application/atom+xml, application/xml, text/xml, */*"
-          }
-        });
-
-        debugLog.push(`[${new Date().toLocaleTimeString()}] Direct Status: ${res.status} ${res.statusText}`);
-
+        debugLog.push(`[${new Date().toLocaleTimeString()}] Fetching Search RSS for term "${term}": ${searchRssUrl}`);
+        const res = await fetch(searchRssUrl, { headers: { "User-Agent": USER_AGENT } });
         if (res.ok) {
           const xmlText = await res.text();
-          if (xmlText && xmlText.length > 0) {
-            let posts = parseRedditRSS(xmlText, sub);
-            if (!isSubreddit && posts.length > 0) {
-              const qLower = rawQuery.toLowerCase();
-              const filtered = posts.filter(p => p.title.toLowerCase().includes(qLower) || p.body.toLowerCase().includes(qLower));
-              if (filtered.length > 0) posts = filtered;
-            }
-            if (posts.length > 0) {
-              rssCache.set(cacheKey, { posts, timestamp: Date.now(), searchType });
-              debugLog.push(`[${new Date().toLocaleTimeString()}] Cached ${posts.length} posts via Direct RSS`);
-              return { posts, debugLog, status: 200, searchType, query: isSubreddit ? sanitizedSub : rawQuery };
-            }
+          const posts = parseRedditRSS(xmlText, "search");
+          if (posts.length > 0) {
+            rssCache.set(cacheKey, { posts, timestamp: Date.now(), searchType });
+            return { posts, debugLog, status: 200, searchType: "keyword", query: rawQuery };
           }
-        } else {
-          lastError = `Status ${res.status}`;
         }
-      } catch (err: any) {
-        debugLog.push(`[${new Date().toLocaleTimeString()}] Direct fetch exception: ${err.message}`);
-        lastError = err.message;
-      }
-    }
+      } catch {}
 
-    // Step 2: Cloud RSS Bridge Fallback (Bypasses Vercel datacenter IP 429/403 rate limits)
-    debugLog.push(`[${new Date().toLocaleTimeString()}] Direct fetches rate limited on cloud IP. Running Cloud RSS Bridge...`);
-    for (const sub of subCandidates) {
+      // Attempt 2: Bridge Search RSS
       try {
-        const rssUrl = `https://www.reddit.com/r/${sub}/hot.rss`;
-        const bridgeUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rssUrl)}`;
-        debugLog.push(`[${new Date().toLocaleTimeString()}] Bridge Fetching: ${bridgeUrl}`);
-
+        const bridgeUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(searchRssUrl)}`;
+        debugLog.push(`[${new Date().toLocaleTimeString()}] Bridge Fetching Search RSS: ${bridgeUrl}`);
         const bridgeRes = await fetch(bridgeUrl);
         if (bridgeRes.ok) {
-          const data = await bridgeRes.json();
-          if (data.status === "ok" && data.items && data.items.length > 0) {
-            let posts = parseRSS2JSON(data, sub);
-            if (!isSubreddit && posts.length > 0) {
-              const qLower = rawQuery.toLowerCase();
-              const filtered = posts.filter(p => p.title.toLowerCase().includes(qLower) || p.body.toLowerCase().includes(qLower));
-              if (filtered.length > 0) posts = filtered;
-            }
+          const json = await bridgeRes.json();
+          if (json.status === "ok" && json.items && json.items.length > 0) {
+            const posts = parseRSS2JSON(json, "search");
             if (posts.length > 0) {
               rssCache.set(cacheKey, { posts, timestamp: Date.now(), searchType });
-              debugLog.push(`[${new Date().toLocaleTimeString()}] Cached ${posts.length} posts via Cloud RSS Bridge`);
-              return { posts, debugLog, status: 200, searchType, query: isSubreddit ? sanitizedSub : rawQuery };
+              return { posts, debugLog, status: 200, searchType: "keyword", query: rawQuery };
             }
           }
         }
-      } catch (bridgeErr: any) {
-        debugLog.push(`[${new Date().toLocaleTimeString()}] Bridge exception for ${sub}: ${bridgeErr.message}`);
-      }
+      } catch {}
     }
 
-    // Fallback to stale cache if available
-    if (cached && cached.posts.length > 0) {
-      debugLog.push(`[${new Date().toLocaleTimeString()}] Live fetch rate limited. Returning stale cache (${cached.posts.length} posts)`);
-      return { posts: cached.posts, debugLog, status: 200, searchType, query: isSubreddit ? sanitizedSub : rawQuery };
-    }
-
+    // Return empty results if keyword search yields no items (NEVER fallback to r/startups!)
     return {
       posts: [],
-      debugLog: [...debugLog, `[${new Date().toLocaleTimeString()}] All endpoints failed. Last error: ${lastError}`],
-      status: 500,
-      searchType,
-      query: isSubreddit ? sanitizedSub : rawQuery
+      debugLog: [...debugLog, `[${new Date().toLocaleTimeString()}] No matching posts found for "${rawQuery}"`],
+      status: 200,
+      searchType: "keyword",
+      query: rawQuery
     };
   });
