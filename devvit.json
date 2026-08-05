@@ -1,0 +1,35 @@
+{
+  "$schema": "https://developers.reddit.com/schema/config-file.v1.json",
+  "name": "questly-ai-leads",
+  "permissions": {
+    "reddit": true
+  },
+  "post": {
+    "dir": "dist/client",
+    "entrypoints": {
+      "default": {
+        "entry": "index.html",
+        "inline": true
+      }
+    }
+  },
+  "server": {
+    "entry": "index.cjs"
+  },
+  "menu": {
+    "items": [
+      {
+        "label": "Create Reddit Posts Viewer",
+        "location": "subreddit",
+        "endpoint": "/internal/menu/post-create"
+      }
+    ]
+  },
+  "scripts": {
+    "build": "vite build -c vite.devvit.config.ts",
+    "dev": "vite build -c vite.devvit.config.ts --watch"
+  },
+  "dev": {
+    "subreddit": "questly_ai_leads_dev"
+  }
+}

@@ -13,12 +13,14 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
+import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedDirectoryRouteImport } from './routes/_authenticated/directory'
 import { Route as AuthenticatedExportsRouteImport } from './routes/_authenticated/exports'
 import { Route as AuthenticatedHistoryRouteImport } from './routes/_authenticated/history'
 import { Route as AuthenticatedIntentLeadsRouteImport } from './routes/_authenticated/intent-leads'
 import { Route as AuthenticatedProjectsRouteImport } from './routes/_authenticated/projects'
+import { Route as AuthenticatedRedditPostsRouteImport } from './routes/_authenticated/reddit-posts'
 import { Route as AuthenticatedResultsRouteImport } from './routes/_authenticated/results'
 import { Route as AuthenticatedSearchRouteImport } from './routes/_authenticated/search'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
@@ -44,6 +46,11 @@ const ResetPasswordRoute = ResetPasswordRouteImport.update({
   id: '/reset-password',
   path: '/reset-password',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   id: '/dashboard',
@@ -76,6 +83,12 @@ const AuthenticatedProjectsRoute = AuthenticatedProjectsRouteImport.update({
   path: '/projects',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedRedditPostsRoute =
+  AuthenticatedRedditPostsRouteImport.update({
+    id: '/reddit-posts',
+    path: '/reddit-posts',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedResultsRoute = AuthenticatedResultsRouteImport.update({
   id: '/results',
   path: '/results',
@@ -112,12 +125,14 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRouteWithChildren
   '/reset-password': typeof ResetPasswordRoute
+  '/admin': typeof AuthenticatedAdminRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/directory': typeof AuthenticatedDirectoryRoute
   '/exports': typeof AuthenticatedExportsRoute
   '/history': typeof AuthenticatedHistoryRoute
   '/intent-leads': typeof AuthenticatedIntentLeadsRoute
   '/projects': typeof AuthenticatedProjectsRoute
+  '/reddit-posts': typeof AuthenticatedRedditPostsRoute
   '/results': typeof AuthenticatedResultsRoute
   '/search': typeof AuthenticatedSearchRouteWithChildren
   '/settings': typeof AuthenticatedSettingsRoute
@@ -129,12 +144,14 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRouteWithChildren
   '/reset-password': typeof ResetPasswordRoute
+  '/admin': typeof AuthenticatedAdminRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/directory': typeof AuthenticatedDirectoryRoute
   '/exports': typeof AuthenticatedExportsRoute
   '/history': typeof AuthenticatedHistoryRoute
   '/intent-leads': typeof AuthenticatedIntentLeadsRoute
   '/projects': typeof AuthenticatedProjectsRoute
+  '/reddit-posts': typeof AuthenticatedRedditPostsRoute
   '/results': typeof AuthenticatedResultsRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/search/$id': typeof AuthenticatedSearchIdRoute
@@ -147,12 +164,14 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/auth': typeof AuthRouteWithChildren
   '/reset-password': typeof ResetPasswordRoute
+  '/_authenticated/admin': typeof AuthenticatedAdminRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/directory': typeof AuthenticatedDirectoryRoute
   '/_authenticated/exports': typeof AuthenticatedExportsRoute
   '/_authenticated/history': typeof AuthenticatedHistoryRoute
   '/_authenticated/intent-leads': typeof AuthenticatedIntentLeadsRoute
   '/_authenticated/projects': typeof AuthenticatedProjectsRoute
+  '/_authenticated/reddit-posts': typeof AuthenticatedRedditPostsRoute
   '/_authenticated/results': typeof AuthenticatedResultsRoute
   '/_authenticated/search': typeof AuthenticatedSearchRouteWithChildren
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
@@ -166,12 +185,14 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/reset-password'
+    | '/admin'
     | '/dashboard'
     | '/directory'
     | '/exports'
     | '/history'
     | '/intent-leads'
     | '/projects'
+    | '/reddit-posts'
     | '/results'
     | '/search'
     | '/settings'
@@ -183,12 +204,14 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/reset-password'
+    | '/admin'
     | '/dashboard'
     | '/directory'
     | '/exports'
     | '/history'
     | '/intent-leads'
     | '/projects'
+    | '/reddit-posts'
     | '/results'
     | '/settings'
     | '/search/$id'
@@ -200,12 +223,14 @@ export interface FileRouteTypes {
     | '/_authenticated'
     | '/auth'
     | '/reset-password'
+    | '/_authenticated/admin'
     | '/_authenticated/dashboard'
     | '/_authenticated/directory'
     | '/_authenticated/exports'
     | '/_authenticated/history'
     | '/_authenticated/intent-leads'
     | '/_authenticated/projects'
+    | '/_authenticated/reddit-posts'
     | '/_authenticated/results'
     | '/_authenticated/search'
     | '/_authenticated/settings'
@@ -251,6 +276,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ResetPasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated/admin': {
+      id: '/_authenticated/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AuthenticatedAdminRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/dashboard': {
       id: '/_authenticated/dashboard'
       path: '/dashboard'
@@ -291,6 +323,13 @@ declare module '@tanstack/react-router' {
       path: '/projects'
       fullPath: '/projects'
       preLoaderRoute: typeof AuthenticatedProjectsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/reddit-posts': {
+      id: '/_authenticated/reddit-posts'
+      path: '/reddit-posts'
+      fullPath: '/reddit-posts'
+      preLoaderRoute: typeof AuthenticatedRedditPostsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/results': {
@@ -352,24 +391,28 @@ const AuthenticatedSearchRouteWithChildren =
   AuthenticatedSearchRoute._addFileChildren(AuthenticatedSearchRouteChildren)
 
 interface AuthenticatedRouteRouteChildren {
+  AuthenticatedAdminRoute: typeof AuthenticatedAdminRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedDirectoryRoute: typeof AuthenticatedDirectoryRoute
   AuthenticatedExportsRoute: typeof AuthenticatedExportsRoute
   AuthenticatedHistoryRoute: typeof AuthenticatedHistoryRoute
   AuthenticatedIntentLeadsRoute: typeof AuthenticatedIntentLeadsRoute
   AuthenticatedProjectsRoute: typeof AuthenticatedProjectsRoute
+  AuthenticatedRedditPostsRoute: typeof AuthenticatedRedditPostsRoute
   AuthenticatedResultsRoute: typeof AuthenticatedResultsRoute
   AuthenticatedSearchRoute: typeof AuthenticatedSearchRouteWithChildren
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
+  AuthenticatedAdminRoute: AuthenticatedAdminRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedDirectoryRoute: AuthenticatedDirectoryRoute,
   AuthenticatedExportsRoute: AuthenticatedExportsRoute,
   AuthenticatedHistoryRoute: AuthenticatedHistoryRoute,
   AuthenticatedIntentLeadsRoute: AuthenticatedIntentLeadsRoute,
   AuthenticatedProjectsRoute: AuthenticatedProjectsRoute,
+  AuthenticatedRedditPostsRoute: AuthenticatedRedditPostsRoute,
   AuthenticatedResultsRoute: AuthenticatedResultsRoute,
   AuthenticatedSearchRoute: AuthenticatedSearchRouteWithChildren,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,

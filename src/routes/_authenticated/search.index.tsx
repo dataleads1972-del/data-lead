@@ -47,7 +47,7 @@ function NewSearch() {
   return (
     <div className="p-6 lg:p-10 max-w-5xl mx-auto space-y-8">
       <div>
-        <div className="inline-flex items-center gap-2 text-xs text-violet-300 mb-2"><Sparkles className="h-3 w-3" /> AI multi-agent</div>
+        <div className="inline-flex items-center gap-2 text-xs text-orange-400 mb-2"><Sparkles className="h-3 w-3" /> AI multi-agent</div>
         <h1 className="text-3xl font-semibold tracking-tight">Deploy your agent swarm</h1>
         <p className="text-muted-foreground mt-1">Describe your target. Six agents will collaborate to build a validated lead list.</p>
       </div>
@@ -84,7 +84,7 @@ function NewSearch() {
           <div><Label>Country</Label><Input placeholder="United States" value={country} onChange={(e) => setCountry(e.target.value)} /></div>
           <div><Label>City / Region (optional)</Label><Input placeholder="San Francisco" value={city} onChange={(e) => setCity(e.target.value)} /></div>
           <div>
-            <Label>Target leads: <span className="text-violet-300 font-semibold">{count}</span></Label>
+            <Label>Target leads: <span className="text-orange-400 font-semibold">{count}</span></Label>
             <Slider value={[count]} onValueChange={(v) => setCount(v[0])} min={10} max={100} step={5} className="mt-4" />
           </div>
         </div>

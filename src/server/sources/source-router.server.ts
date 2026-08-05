@@ -3,6 +3,12 @@ import { FirecrawlConnector } from "./firecrawl-connector.server";
 import { GooglePlacesConnector } from "./google-places.server";
 import { RedditConnector } from "./reddit.server";
 import { OverpassConnector } from "./overpass-connector.server";
+import { ThreadsConnector } from "./threads-connector.server";
+import { DiscourseConnector } from "./discourse-connector.server";
+import { RssConnector } from "./rss-connector.server";
+import { HackerNewsConnector } from "./hacker-news.server";
+import { MastodonConnector } from "./mastodon.server";
+import { XConnector } from "./x-connector.server";
 import { SourceKey } from "../../lib/lead-sources.server";
 
 export class SourceRouter {
@@ -17,6 +23,14 @@ export class SourceRouter {
     this.connectors.push(new RedditConnector());
     // Zero-Cost setup: Register free OpenStreetMap/Overpass connector
     this.connectors.push(new OverpassConnector());
+    // Central Source Integration: Register Threads connector
+    this.connectors.push(new ThreadsConnector());
+    // Intent Lead Source Integrations
+    this.connectors.push(new DiscourseConnector());
+    this.connectors.push(new RssConnector());
+    this.connectors.push(new HackerNewsConnector());
+    this.connectors.push(new MastodonConnector());
+    this.connectors.push(new XConnector());
   }
 
   register(connector: LeadSource) {
@@ -31,13 +45,26 @@ export class SourceRouter {
     params: SearchParams,
     onProgress?: (source: SourceKey, count: number) => Promise<void> | void
   ): Promise<CandidateLead[]> {
-    const active = this.connectors.filter(c => {
-      if (!c.isEnabled()) return false;
-      if (params.lead_type === "intent") {
-        return c.name === "Reddit Discovery";
-      }
-      return true;
-    });
+    const activeResults = await Promise.all(
+      this.connectors.map(async (c) => {
+        const enabled = await c.isEnabled();
+        if (!enabled) return null;
+        if (params.lead_type === "intent") {
+          const isIntentSource =
+            c.name === "Reddit Discovery" ||
+            c.name === "Threads Discovery" ||
+            c.name === "Discourse Discovery" ||
+            c.name === "RSS Feed Discovery" ||
+            c.name === "Hacker News Discovery" ||
+            c.name === "Mastodon Discovery" ||
+            c.name === "X (Twitter) Discovery";
+          return isIntentSource ? c : null;
+        }
+        return c;
+      })
+    );
+    const active = activeResults.filter((c): c is LeadSource => c !== null);
+
     
     if (active.length === 0) {
       throw new Error("No active search connectors enabled. Please configure FIRECRAWL_API_KEY.");

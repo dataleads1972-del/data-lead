@@ -2,18 +2,22 @@ import { LeadSource, SearchParams, CandidateLead } from "./source.types";
 import { SourceKey, collectCandidates } from "../../lib/lead-sources.server";
 import { firecrawlSearch } from "../../lib/firecrawl.server";
 import { generateQueries } from "../research/query-generator";
+import { getSourceConfig } from "./source-config.server";
 
 export class FirecrawlConnector implements LeadSource {
   name = "Firecrawl Search";
   sourceKey: SourceKey = "web";
 
-  isEnabled(): boolean {
-    return !!process.env.FIRECRAWL_API_KEY || !!process.env.LOVABLE_API_KEY;
+  async isEnabled(): Promise<boolean> {
+    const config = await getSourceConfig("firecrawl");
+    return config.enabled;
   }
 
   async search(params: SearchParams): Promise<CandidateLead[]> {
-    if (!this.isEnabled()) return [];
+    const config = await getSourceConfig("firecrawl");
+    if (!config.enabled) return [];
     
+    const apiKey = config.secrets.apiKey;
     const baseQueries = generateQueries(params);
     const perQuery = params.depth === "deep" ? 12 : params.depth === "quick" ? 5 : 8;
     const allHits: any[] = [];
@@ -27,7 +31,7 @@ export class FirecrawlConnector implements LeadSource {
     
     for (const chunk of chunks) {
       const settled = await Promise.allSettled(
-        chunk.map(q => firecrawlSearch(q, { limit: perQuery, country: params.country || undefined }))
+        chunk.map(q => firecrawlSearch(q, { limit: perQuery, country: params.country || undefined, apiKey }))
       );
       for (const res of settled) {
         if (res.status === "fulfilled" && Array.isArray(res.value)) {

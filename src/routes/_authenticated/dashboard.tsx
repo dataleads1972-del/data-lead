@@ -36,10 +36,10 @@ function Dashboard() {
         <StatCard icon={TrendingUp} label="Success rate" value="98%" />
       </div>
 
-      <Card className="p-6 bg-gradient-to-br from-violet-500/10 to-blue-500/10 border-violet-500/20">
+      <Card className="p-6 bg-gradient-to-br from-orange-500/10 to-transparent border-orange-500/20">
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
-            <div className="flex items-center gap-2 text-sm text-violet-300"><Sparkles className="h-4 w-4" /> Ready to hunt</div>
+            <div className="flex items-center gap-2 text-sm text-orange-400"><Sparkles className="h-4 w-4" /> Ready to hunt</div>
             <h2 className="text-2xl font-semibold mt-2">Start a new AI-powered search</h2>
             <p className="text-muted-foreground mt-1 max-w-lg">Six agents work in parallel to research the market, discover companies, enrich contacts, and deliver a validated lead list.</p>
           </div>
@@ -79,8 +79,8 @@ function StatCard({ icon: Icon, label, value }: { icon: any; label: string; valu
   return (
     <Card className="p-5">
       <div className="flex items-center gap-3">
-        <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-violet-500/20 to-blue-500/20 flex items-center justify-center">
-          <Icon className="h-5 w-5 text-violet-300" />
+        <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-orange-500/20 to-transparent flex items-center justify-center">
+          <Icon className="h-5 w-5 text-orange-400" />
         </div>
         <div>
           <div className="text-xs text-muted-foreground">{label}</div>

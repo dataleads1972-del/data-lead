@@ -2,20 +2,21 @@ import { LeadSource, SearchParams, CandidateLead } from "./source.types";
 import { SourceKey } from "../../lib/lead-sources.server";
 import { generateQueries } from "../research/query-generator";
 import { scorePost } from "../validation/intent-scorer";
+import { getSourceConfig } from "./source-config.server";
 
-async function fetchRedditPosts(query: string, limit = 20): Promise<any[]> {
-  const clientId = process.env.REDDIT_CLIENT_ID;
-  const clientSecret = process.env.REDDIT_CLIENT_SECRET;
+async function fetchRedditPosts(query: string, limit = 20, clientId?: string, clientSecret?: string): Promise<any[]> {
+  const finalClientId = clientId || process.env.REDDIT_CLIENT_ID;
+  const finalClientSecret = clientSecret || process.env.REDDIT_CLIENT_SECRET;
   
   const headers: Record<string, string> = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) B2BLeadSwarmBot/1.0"
   };
 
-  if (clientId && clientSecret) {
+  if (finalClientId && finalClientSecret) {
     try {
       // Official API path using OAuth client credentials
       const tokenUrl = "https://www.reddit.com/api/v1/access_token";
-      const auth = btoa(`${clientId.trim()}:${clientSecret.trim()}`);
+      const auth = btoa(`${finalClientId.trim()}:${finalClientSecret.trim()}`);
       const tokenRes = await fetch(tokenUrl, {
         method: "POST",
         headers: {
@@ -60,12 +61,17 @@ export class RedditConnector implements LeadSource {
   name = "Reddit Discovery";
   sourceKey: SourceKey = "directory";
 
-  isEnabled(): boolean {
-    return true; 
+  async isEnabled(): Promise<boolean> {
+    const config = await getSourceConfig("reddit");
+    return config.enabled;
   }
 
   async search(params: SearchParams): Promise<CandidateLead[]> {
-    if (!this.isEnabled()) return [];
+    const config = await getSourceConfig("reddit");
+    if (!config.enabled) return [];
+    
+    const clientId = config.secrets.clientId;
+    const clientSecret = config.secrets.clientSecret;
     
     const isIntentSearch = params.lead_type === "intent";
     
@@ -84,7 +90,7 @@ export class RedditConnector implements LeadSource {
     const candidates: CandidateLead[] = [];
 
     try {
-      const children = await fetchRedditPosts(query, 20);
+      const children = await fetchRedditPosts(query, 20, clientId, clientSecret);
 
       for (const child of children) {
         const post = child.data;

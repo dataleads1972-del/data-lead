@@ -35,6 +35,6 @@ export interface SearchParams {
 export interface LeadSource {
   name: string;
   sourceKey: SourceKey;
-  isEnabled(): boolean;
+  isEnabled(): Promise<boolean> | boolean;
   search(params: SearchParams): Promise<CandidateLead[]>;
 }

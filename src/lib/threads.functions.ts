@@ -21,12 +21,16 @@ export const exchangeThreadsCode = createServerFn({ method: "POST" })
       code: z.string(),
       userId: z.string().uuid(),
       origin: z.string().url(),
+      isAdminConnection: z.boolean().optional(),
     }).parse(d)
   )
   .handler(async ({ data }) => {
-    const appId = process.env.THREADS_APP_ID;
-    const appSecret = process.env.THREADS_APP_SECRET;
-    const redirectUri = process.env.THREADS_REDIRECT_URI;
+    const { getSourceConfig } = await import("../server/sources/source-config.server");
+    const threadConfig = await getSourceConfig("threads");
+
+    const appId = threadConfig.config.appId || process.env.THREADS_APP_ID;
+    const appSecret = threadConfig.secrets.appSecret || process.env.THREADS_APP_SECRET;
+    const redirectUri = threadConfig.config.redirectUri || process.env.THREADS_REDIRECT_URI;
 
     if (!appId || !appSecret || !redirectUri) {
       throw new Error("Threads API keys or redirect URI not configured in server environment.");
@@ -87,16 +91,44 @@ export const exchangeThreadsCode = createServerFn({ method: "POST" })
 
     // 4. Save connection securely using supabaseAdmin
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { error: dbError } = await supabaseAdmin.from("threads_connections").upsert({
-      user_id: data.userId,
-      access_token: accessToken,
-      threads_user_id: String(threadsUserId || profileJson.id),
-      username,
-      updated_at: new Date().toISOString(),
-    });
+    
+    if (data.isAdminConnection) {
+      // Security: Check user role is admin
+      const { data: roleData, error: roleError } = await supabaseAdmin
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", data.userId)
+        .maybeSingle();
 
-    if (dbError) {
-      throw new Error(`Database error saving Threads connection: ${dbError.message}`);
+      if (roleError || !roleData || roleData.role !== "admin") {
+        throw new Error("Unauthorized: Only platform admins can establish a central Threads connection.");
+      }
+
+      // Save to source_integrations
+      const { error: dbError } = await (supabaseAdmin as any).from("source_integrations").upsert({
+        id: "threads",
+        status: "connected",
+        config: { ...threadConfig.config, enabled: true, username },
+        secrets: { ...threadConfig.secrets, accessToken, threadsUserId: String(threadsUserId || profileJson.id) },
+        updated_at: new Date().toISOString(),
+        updated_by: data.userId,
+      });
+
+      if (dbError) {
+        throw new Error(`Database error saving Threads admin connection: ${dbError.message}`);
+      }
+    } else {
+      const { error: dbError } = await supabaseAdmin.from("threads_connections").upsert({
+        user_id: data.userId,
+        access_token: accessToken,
+        threads_user_id: String(threadsUserId || profileJson.id),
+        username,
+        updated_at: new Date().toISOString(),
+      });
+
+      if (dbError) {
+        throw new Error(`Database error saving Threads connection: ${dbError.message}`);
+      }
     }
 
     return { success: true, username };
@@ -146,8 +178,10 @@ export const testThreadsProfile = createServerFn({ method: "POST" })
 export const getThreadsConfig = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async () => {
+    const { getSourceConfig } = await import("../server/sources/source-config.server");
+    const threadConfig = await getSourceConfig("threads");
     return {
-      appId: process.env.THREADS_APP_ID || null,
-      redirectUri: process.env.THREADS_REDIRECT_URI || null,
+      appId: threadConfig.config.appId || process.env.THREADS_APP_ID || null,
+      redirectUri: threadConfig.config.redirectUri || process.env.THREADS_REDIRECT_URI || null,
     };
   });

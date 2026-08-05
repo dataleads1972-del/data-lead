@@ -1,16 +1,19 @@
 import { LeadSource, SearchParams, CandidateLead } from "./source.types";
 import { SourceKey } from "../../lib/lead-sources.server";
+import { getSourceConfig } from "./source-config.server";
 
 export class OverpassConnector implements LeadSource {
   name = "OpenStreetMap / Overpass";
   sourceKey: SourceKey = "google_maps"; // Mapped to google_maps so they display under the maps agent step in the UI
 
-  isEnabled(): boolean {
-    return true; // Overpass is a free API, no API key required
+  async isEnabled(): Promise<boolean> {
+    const config = await getSourceConfig("openstreetmap");
+    return config.enabled;
   }
 
   async search(params: SearchParams): Promise<CandidateLead[]> {
-    if (!this.isEnabled()) return [];
+    const config = await getSourceConfig("openstreetmap");
+    if (!config.enabled) return [];
 
     const locName = params.city || params.state;
     if (!locName) return []; // Overpass needs local city or state area context to avoid global/country-wide timeouts

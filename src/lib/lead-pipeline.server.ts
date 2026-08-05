@@ -23,6 +23,7 @@ export type SearchRow = {
   target_count: number;
   depth: string;
   strategy: string;
+  lead_type: string | null;
 };
 
 export async function logEvent(

@@ -43,7 +43,7 @@ function IntentScoreBadge({ score }: { score: number }) {
   let text = "Low Intent";
 
   if (score >= 80) {
-    colorClass = "bg-violet-500/10 text-violet-400 border-violet-500/20";
+    colorClass = "bg-orange-500/10 text-orange-400 border-orange-500/20";
     text = "High Intent";
   } else if (score >= 50) {
     colorClass = "bg-amber-500/10 text-amber-400 border-amber-500/20";
@@ -135,10 +135,10 @@ function IntentLeadsDashboard() {
 
       {/* Metrics Section */}
       <div className="grid gap-4 grid-cols-1 md:grid-cols-3">
-        <Card className="p-5 bg-gradient-to-br from-violet-500/5 to-transparent border-violet-500/10 flex flex-col justify-between">
+        <Card className="p-5 bg-gradient-to-br from-orange-500/5 to-transparent border-orange-500/10 flex flex-col justify-between">
           <span className="text-sm font-medium text-muted-foreground">Total Signals Discovered</span>
           <div className="flex items-baseline gap-2 mt-2">
-            <span className="text-3xl font-bold tracking-tight text-violet-300">{stats.total}</span>
+            <span className="text-3xl font-bold tracking-tight text-orange-400">{stats.total}</span>
             <span className="text-xs text-muted-foreground">matching filters</span>
           </div>
         </Card>
@@ -189,6 +189,7 @@ function IntentLeadsDashboard() {
               <SelectContent>
                 <SelectItem value="all">All Platforms</SelectItem>
                 <SelectItem value="reddit">Reddit</SelectItem>
+                <SelectItem value="threads">Threads</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -257,7 +258,7 @@ function IntentLeadsDashboard() {
                   <div className="flex items-start justify-between gap-4">
                     <div className="space-y-1.5">
                       <div className="flex items-center flex-wrap gap-2">
-                        <Badge variant="outline" className="border-violet-500/20 text-violet-400 bg-violet-500/5">
+                        <Badge variant="outline" className="border-orange-500/20 text-orange-400 bg-orange-500/5">
                           {lead.matched_keyword || "hiring"}
                         </Badge>
                         <Badge variant="secondary" className="text-xs font-normal">

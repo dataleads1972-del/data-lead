@@ -13,6 +13,7 @@ import {
   testThreadsProfile,
   getThreadsConfig,
 } from "@/lib/threads.functions";
+import { elevateToAdmin } from "@/lib/admin.functions";
 
 export const Route = createFileRoute("/_authenticated/settings")({
   head: () => ({ meta: [{ title: "Settings — LeadAI" }, { name: "description", content: "Manage your profile and workspace preferences." }] }),
@@ -29,11 +30,28 @@ function Settings() {
   const disconnectFn = useServerFn(disconnectThreads);
   const testProfileFn = useServerFn(testThreadsProfile);
   const getConfigFn = useServerFn(getThreadsConfig);
+  const elevateFn = useServerFn(elevateToAdmin);
 
   const [threadsConnection, setThreadsConnection] = useState<any>(null);
   const [loadingConfig, setLoadingConfig] = useState(false);
   const [testingConnection, setTestingConnection] = useState(false);
   const [profileData, setProfileData] = useState<any>(null);
+  const [elevating, setElevating] = useState(false);
+
+  const handleElevate = async () => {
+    setElevating(true);
+    try {
+      await elevateFn();
+      toast.success("Account elevated to Admin successfully!");
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
+    } catch (e: any) {
+      toast.error(e.message || "Failed to elevate account.");
+    } finally {
+      setElevating(false);
+    }
+  };
 
   const fetchConnection = async () => {
     try {
@@ -136,6 +154,16 @@ function Settings() {
             <h2 className="font-medium mb-2">Credits</h2>
             <div className="text-3xl font-semibold">{credits}</div>
             <p className="text-sm text-muted-foreground mt-1">Credits are consumed as agents run searches (~1 credit per 5 leads).</p>
+          </Card>
+
+          <Card className="p-6 border-violet-500/20 bg-violet-500/5">
+            <h2 className="font-medium mb-2 text-violet-400">Developer Zone</h2>
+            <p className="text-xs text-muted-foreground mb-4">
+              Elevate your user account to Platform Admin for testing permissions and dashboard views.
+            </p>
+            <Button onClick={handleElevate} disabled={elevating} className="w-full bg-violet-600 hover:bg-violet-500 text-white font-semibold">
+              {elevating ? "Elevating Account..." : "Elevate to Admin"}
+            </Button>
           </Card>
         </div>
 
