@@ -1,29 +1,64 @@
-# Welcome to your Lovable project
+# Questly AI Leads / Leadly
 
-This project was built with [Lovable](https://lovable.dev).
+Questly is a B2B lead generation and buying intent discovery platform. It automatically scans public sources (like Reddit), profiles companies, retrieves verified contact details, checks intent signals, and formats leads into actionable B2B prospects.
 
-## Build with Lovable
+---
 
-Open your project in the [Lovable editor](https://lovable.dev) and keep building.
+## Key Features
 
-- **Ship faster**: describe what you want to build and Lovable handles the code.
-- **Stay in sync**: connect the project to GitHub and every change made in Lovable is committed straight to your repository.
-- **Full ownership**: this code is yours. Push to your repository and your changes sync back into Lovable, ready for your next prompt.
+* **B2B Discovery Pipeline**: Discovers local businesses via OpenStreetMap (Overpass) and search pages, then scrapes official websites for public emails, phones, and social handles.
+* **Buying Intent Discovery**: Continuously monitors public boards (like Reddit) using search endpoints, running posts through a rule-based intent scorer to isolate high-intent hiring/purchasing signals (e.g. *"looking for a web developer"*).
+* **Smart Filtering & Deduplication**: Cleans duplicate business domains, filters out self-promoters or tutorials, and computes confidence scores.
+* **Realtime Workspace**: Displays active progress indicators, live event logging, and status logs via Supabase broadcast channels.
+* **Export Options**: Export structured lists easily to CSV or XLSX formats.
 
-## Development
+---
 
-Prefer working locally? You need Node.js and npm — [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating).
+## Technology Stack
 
-```sh
-git clone <this-repository-url>
-cd <repository-name>
-npm i
-npm run dev
+* **Frontend & Router**: TanStack Start (React 19, Vinxi, TypeScript)
+* **Backend Engines**: Nitro server engine mapping server functions and route hooks.
+* **Database & PubSub**: Supabase (PostgreSQL + broadcast triggers)
+* **Testing & Build Tools**: Vitest and Vite
+
+---
+
+## Development Setup
+
+### 1. Configure Credentials
+Create a `.env` file in the root of the project:
+
+```bash
+# Supabase Configuration
+VITE_SUPABASE_URL=your_supabase_project_url
+VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+
+# Scraper & Search Keys
+FIRECRAWL_API_KEY=your_firecrawl_api_key
+LOVABLE_API_KEY=your_lovable_api_key
+
+# Reddit API Credentials (Optional - Authenticated path)
+REDDIT_CLIENT_ID=your_reddit_client_id
+REDDIT_CLIENT_SECRET=your_reddit_client_secret
 ```
 
-## Built with
+### 2. Install and Run
+```bash
+# Install package dependencies
+npm install
 
-- TanStack Start
-- TypeScript
-- React
-- Tailwind CSS
+# Run hot-reloading development server
+npm run dev
+
+# Run Vitest test runner
+npm run test:run
+
+# Compile static and SSR bundles
+npm run build
+```
+
+---
+
+## Deployments
+The project includes a `vercel.json` preset for easy deployment to Vercel. Pushing code to your main branch on GitHub automatically deploys Vinxi/Nitro bundles.
