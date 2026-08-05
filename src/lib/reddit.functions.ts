@@ -74,6 +74,35 @@ function parseRedditRSS(xmlText: string, fallbackSubreddit: string) {
   return posts;
 }
 
+function parseRSS2JSON(data: any, subreddit: string) {
+  const items = data?.items || [];
+  return items.map((item: any, i: number) => {
+    let body = item.content || item.description || "";
+    body = body
+      .replace(/<[^>]+>/g, "")
+      .replace(/&amp;/g, "&")
+      .replace(/&lt;/g, "<")
+      .replace(/&gt;/g, ">")
+      .replace(/&quot;/g, '"')
+      .replace(/submitted by[\s\S]+/, "")
+      .trim();
+
+    const rawAuthor = item.author || "";
+    const author = rawAuthor.replace(/^\/u\//i, "");
+
+    return {
+      id: item.guid || `rss2json_${i}`,
+      subreddit,
+      title: decodeHTMLEntities(item.title || ""),
+      body: body.slice(0, 500),
+      author,
+      createdAt: item.pubDate || new Date().toISOString(),
+      permalink: item.link || "",
+      url: item.link || ""
+    };
+  });
+}
+
 export interface FetchRedditResult {
   posts: any[];
   debugLog: string[];
@@ -135,93 +164,94 @@ export const fetchRedditSubPosts = createServerFn({ method: "GET" })
 
     debugLog.push(`[${new Date().toLocaleTimeString()}] Cache MISS. Executing ${searchType} search for: "${rawQuery}"`);
 
-    // Build endpoints candidate list
-    const endpoints: string[] = [];
+    // Build target subreddits to fetch
+    const subCandidates: string[] = [];
     if (isSubreddit) {
-      endpoints.push(`https://www.reddit.com/r/${sanitizedSub}/hot.rss`);
-      endpoints.push(`https://www.reddit.com/r/${sanitizedSub}/.rss`);
+      subCandidates.push(sanitizedSub);
     } else {
-      // Keyword search: try subreddit feed first if single word, or search feed
-      const cleanKeyword = rawQuery.replace(/\s+/g, "");
-      endpoints.push(`https://www.reddit.com/r/${cleanKeyword}/hot.rss`);
-      endpoints.push(`https://www.reddit.com/r/startups/hot.rss`);
+      const cleanWord = rawQuery.replace(/[^a-z0-9]/gi, "").toLowerCase();
+      if (cleanWord && cleanWord.length > 2) {
+        subCandidates.push(cleanWord);
+      }
+      subCandidates.push("startups");
+      subCandidates.push("SaaS");
+      subCandidates.push("webdev");
     }
 
     let lastError = "";
 
-    for (const url of endpoints) {
+    // Step 1: Direct RSS Fetch
+    for (const sub of subCandidates) {
+      const rssUrl = `https://www.reddit.com/r/${sub}/hot.rss`;
       try {
-        debugLog.push(`[${new Date().toLocaleTimeString()}] Fetching URL: ${url}`);
-        const res = await fetch(url, {
+        debugLog.push(`[${new Date().toLocaleTimeString()}] Direct Fetching URL: ${rssUrl}`);
+        const res = await fetch(rssUrl, {
           headers: {
             "User-Agent": USER_AGENT,
             "Accept": "application/atom+xml, application/xml, text/xml, */*"
           }
         });
 
-        debugLog.push(`[${new Date().toLocaleTimeString()}] HTTP Status: ${res.status} ${res.statusText}`);
+        debugLog.push(`[${new Date().toLocaleTimeString()}] Direct Status: ${res.status} ${res.statusText}`);
 
-        if (res.status === 429) {
-          debugLog.push(`[${new Date().toLocaleTimeString()}] Rate limited (429) by Reddit for ${url}`);
-          lastError = "Reddit rate limit reached (429). Please wait a few seconds.";
-          continue;
-        }
-
-        if (!res.ok) {
-          debugLog.push(`[${new Date().toLocaleTimeString()}] Non-OK response (${res.status}) for ${url}`);
-          lastError = `Query "${rawQuery}" returned status ${res.status}`;
-          continue;
-        }
-
-        const xmlText = await res.text();
-        debugLog.push(`[${new Date().toLocaleTimeString()}] Received XML payload (${xmlText.length} bytes)`);
-
-        if (!xmlText || xmlText.length === 0) {
-          debugLog.push(`[${new Date().toLocaleTimeString()}] Received 0-byte payload for ${url}`);
-          lastError = "Received empty 0-byte payload from Reddit";
-          continue;
-        }
-
-        let posts = parseRedditRSS(xmlText, isSubreddit ? sanitizedSub : "startups");
-        
-        // Filter posts if keyword search
-        if (!isSubreddit && posts.length > 0) {
-          const qLower = rawQuery.toLowerCase();
-          const filtered = posts.filter(p => p.title.toLowerCase().includes(qLower) || p.body.toLowerCase().includes(qLower));
-          if (filtered.length > 0) {
-            posts = filtered;
+        if (res.ok) {
+          const xmlText = await res.text();
+          if (xmlText && xmlText.length > 0) {
+            let posts = parseRedditRSS(xmlText, sub);
+            if (!isSubreddit && posts.length > 0) {
+              const qLower = rawQuery.toLowerCase();
+              const filtered = posts.filter(p => p.title.toLowerCase().includes(qLower) || p.body.toLowerCase().includes(qLower));
+              if (filtered.length > 0) posts = filtered;
+            }
+            if (posts.length > 0) {
+              rssCache.set(cacheKey, { posts, timestamp: Date.now(), searchType });
+              debugLog.push(`[${new Date().toLocaleTimeString()}] Cached ${posts.length} posts via Direct RSS`);
+              return { posts, debugLog, status: 200, searchType, query: isSubreddit ? sanitizedSub : rawQuery };
+            }
           }
-        }
-
-        debugLog.push(`[${new Date().toLocaleTimeString()}] Successfully parsed ${posts.length} posts from Atom XML`);
-
-        if (posts.length > 0) {
-          rssCache.set(cacheKey, { posts, timestamp: Date.now(), searchType });
-          debugLog.push(`[${new Date().toLocaleTimeString()}] Cached ${posts.length} posts for "${cacheKey}" in server memory`);
-          return {
-            posts,
-            debugLog,
-            status: res.status,
-            searchType,
-            query: isSubreddit ? sanitizedSub : rawQuery
-          };
+        } else {
+          lastError = `Status ${res.status}`;
         }
       } catch (err: any) {
-        debugLog.push(`[${new Date().toLocaleTimeString()}] Exception during fetch: ${err.message}`);
+        debugLog.push(`[${new Date().toLocaleTimeString()}] Direct fetch exception: ${err.message}`);
         lastError = err.message;
       }
     }
 
-    // Fallback to stale cache if rate limited
+    // Step 2: Cloud RSS Bridge Fallback (Bypasses Vercel datacenter IP 429/403 rate limits)
+    debugLog.push(`[${new Date().toLocaleTimeString()}] Direct fetches rate limited on cloud IP. Running Cloud RSS Bridge...`);
+    for (const sub of subCandidates) {
+      try {
+        const rssUrl = `https://www.reddit.com/r/${sub}/hot.rss`;
+        const bridgeUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rssUrl)}`;
+        debugLog.push(`[${new Date().toLocaleTimeString()}] Bridge Fetching: ${bridgeUrl}`);
+
+        const bridgeRes = await fetch(bridgeUrl);
+        if (bridgeRes.ok) {
+          const data = await bridgeRes.json();
+          if (data.status === "ok" && data.items && data.items.length > 0) {
+            let posts = parseRSS2JSON(data, sub);
+            if (!isSubreddit && posts.length > 0) {
+              const qLower = rawQuery.toLowerCase();
+              const filtered = posts.filter(p => p.title.toLowerCase().includes(qLower) || p.body.toLowerCase().includes(qLower));
+              if (filtered.length > 0) posts = filtered;
+            }
+            if (posts.length > 0) {
+              rssCache.set(cacheKey, { posts, timestamp: Date.now(), searchType });
+              debugLog.push(`[${new Date().toLocaleTimeString()}] Cached ${posts.length} posts via Cloud RSS Bridge`);
+              return { posts, debugLog, status: 200, searchType, query: isSubreddit ? sanitizedSub : rawQuery };
+            }
+          }
+        }
+      } catch (bridgeErr: any) {
+        debugLog.push(`[${new Date().toLocaleTimeString()}] Bridge exception for ${sub}: ${bridgeErr.message}`);
+      }
+    }
+
+    // Fallback to stale cache if available
     if (cached && cached.posts.length > 0) {
       debugLog.push(`[${new Date().toLocaleTimeString()}] Live fetch rate limited. Returning stale cache (${cached.posts.length} posts)`);
-      return {
-        posts: cached.posts,
-        debugLog,
-        status: 200,
-        searchType,
-        query: isSubreddit ? sanitizedSub : rawQuery
-      };
+      return { posts: cached.posts, debugLog, status: 200, searchType, query: isSubreddit ? sanitizedSub : rawQuery };
     }
 
     return {
