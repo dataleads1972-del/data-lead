@@ -91,40 +91,7 @@ interface CacheEntry {
 const rssCache = new Map<string, CacheEntry>();
 const CACHE_TTL_MS = 60 * 1000;
 
-const stopWords = new Set([
-  "a","an","the","for","is","in","at","of","to","and","or","on","with",
-  "my","our","i","you","we","me","us","be","have","has","had","do","does",
-  "did","would","should","could","please","want","any","some","need"
-]);
-
-function getQueryEndpoints(rawQuery: string, isSubreddit: boolean, sanitizedSub: string): string[] {
-  if (isSubreddit) {
-    return [
-      `https://www.reddit.com/r/${sanitizedSub}/hot/.rss`,
-      `https://www.reddit.com/r/${sanitizedSub}/.rss`
-    ];
-  }
-
-  const words = rawQuery.trim().split(/\s+/);
-  const filtered = words.filter(w => !stopWords.has(w.toLowerCase().replace(/[^a-z0-9]/g, "")));
-  const candidateQueries: string[] = [];
-
-  // Candidate 1: Cleaned non-stopword query (e.g. "looking developer")
-  if (filtered.length > 0) {
-    candidateQueries.push(filtered.join(" "));
-  }
-
-  // Candidate 2: Core noun/keyword (e.g. "developer")
-  if (filtered.length > 1) {
-    candidateQueries.push(filtered[filtered.length - 1]);
-  }
-
-  // Candidate 3: Original raw query string
-  candidateQueries.push(rawQuery);
-
-  const unique = [...new Set(candidateQueries)];
-  return unique.map(q => `https://www.reddit.com/search/.rss?q=${encodeURIComponent(q)}&sort=new`);
-}
+const USER_AGENT = "script:questly-ai-leads:v1.0.0 (by /u/datalead)";
 
 export const fetchRedditSubPosts = createServerFn({ method: "GET" })
   .validator((d: unknown) =>
@@ -168,7 +135,18 @@ export const fetchRedditSubPosts = createServerFn({ method: "GET" })
 
     debugLog.push(`[${new Date().toLocaleTimeString()}] Cache MISS. Executing ${searchType} search for: "${rawQuery}"`);
 
-    const endpoints = getQueryEndpoints(rawQuery, isSubreddit, sanitizedSub);
+    // Build endpoints candidate list
+    const endpoints: string[] = [];
+    if (isSubreddit) {
+      endpoints.push(`https://www.reddit.com/r/${sanitizedSub}/hot.rss`);
+      endpoints.push(`https://www.reddit.com/r/${sanitizedSub}/.rss`);
+    } else {
+      // Keyword search: try subreddit feed first if single word, or search feed
+      const cleanKeyword = rawQuery.replace(/\s+/g, "");
+      endpoints.push(`https://www.reddit.com/r/${cleanKeyword}/hot.rss`);
+      endpoints.push(`https://www.reddit.com/r/startups/hot.rss`);
+    }
+
     let lastError = "";
 
     for (const url of endpoints) {
@@ -176,7 +154,8 @@ export const fetchRedditSubPosts = createServerFn({ method: "GET" })
         debugLog.push(`[${new Date().toLocaleTimeString()}] Fetching URL: ${url}`);
         const res = await fetch(url, {
           headers: {
-            "User-Agent": "QuestlyLeadAgent/1.0.0"
+            "User-Agent": USER_AGENT,
+            "Accept": "application/atom+xml, application/xml, text/xml, */*"
           }
         });
 
@@ -185,8 +164,6 @@ export const fetchRedditSubPosts = createServerFn({ method: "GET" })
         if (res.status === 429) {
           debugLog.push(`[${new Date().toLocaleTimeString()}] Rate limited (429) by Reddit for ${url}`);
           lastError = "Reddit rate limit reached (429). Please wait a few seconds.";
-          // Brief pause before trying next candidate if rate limited
-          await new Promise(r => setTimeout(r, 300));
           continue;
         }
 
@@ -205,7 +182,17 @@ export const fetchRedditSubPosts = createServerFn({ method: "GET" })
           continue;
         }
 
-        const posts = parseRedditRSS(xmlText, isSubreddit ? sanitizedSub : "search");
+        let posts = parseRedditRSS(xmlText, isSubreddit ? sanitizedSub : "startups");
+        
+        // Filter posts if keyword search
+        if (!isSubreddit && posts.length > 0) {
+          const qLower = rawQuery.toLowerCase();
+          const filtered = posts.filter(p => p.title.toLowerCase().includes(qLower) || p.body.toLowerCase().includes(qLower));
+          if (filtered.length > 0) {
+            posts = filtered;
+          }
+        }
+
         debugLog.push(`[${new Date().toLocaleTimeString()}] Successfully parsed ${posts.length} posts from Atom XML`);
 
         if (posts.length > 0) {
@@ -225,7 +212,7 @@ export const fetchRedditSubPosts = createServerFn({ method: "GET" })
       }
     }
 
-    // Fallback to stale cache if rate limited or empty
+    // Fallback to stale cache if rate limited
     if (cached && cached.posts.length > 0) {
       debugLog.push(`[${new Date().toLocaleTimeString()}] Live fetch rate limited. Returning stale cache (${cached.posts.length} posts)`);
       return {
