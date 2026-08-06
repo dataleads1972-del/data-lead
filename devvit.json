@@ -8,8 +8,7 @@
     "dir": "dist/client",
     "entrypoints": {
       "default": {
-        "entry": "index.html",
-        "inline": true
+        "entry": "index.html"
       }
     }
   },

@@ -6,16 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import {
   ExternalLink,
   Search,
@@ -26,7 +17,10 @@ import {
   ArrowUpRight,
   ChevronDown,
   ChevronUp,
+  Brain,
 } from "lucide-react";
+import { AIIntelligenceDrawer } from "@/components/AIIntelligenceDrawer";
+import { AISourceBadge } from "@/components/AISourceBadge";
 
 export const Route = createFileRoute("/_authenticated/intent-leads")({
   head: () => ({
@@ -62,6 +56,7 @@ function IntentLeadsDashboard() {
   const [minScore, setMinScore] = useState<number>(40);
   const [platform, setPlatform] = useState<string>("all");
   const [expandedLead, setExpandedLead] = useState<string | null>(null);
+  const [aiLead, setAiLead] = useState<any | null>(null);
 
   const { data: leads, isLoading } = useQuery({
     queryKey: ["intent-leads"],
@@ -79,7 +74,6 @@ function IntentLeadsDashboard() {
   const filtered = useMemo(() => {
     let list = leads || [];
 
-    // 1. Text Search Filter
     if (q) {
       const s = q.toLowerCase();
       list = list.filter((l: any) =>
@@ -89,12 +83,10 @@ function IntentLeadsDashboard() {
       );
     }
 
-    // 2. Intent Score Slider Filter
     if (minScore > 0) {
       list = list.filter((l: any) => (l.intent_score || 0) >= minScore);
     }
 
-    // 3. Platform Filter
     if (platform !== "all") {
       list = list.filter(
         (l: any) => (l.source_platform || "").toLowerCase() === platform.toLowerCase()
@@ -181,67 +173,47 @@ function IntentLeadsDashboard() {
             />
           </div>
 
-          <div>
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-muted-foreground">Source Platform</label>
             <Select value={platform} onValueChange={setPlatform}>
               <SelectTrigger>
-                <SelectValue placeholder="All platforms" />
+                <SelectValue placeholder="All Platforms" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Platforms</SelectItem>
                 <SelectItem value="reddit">Reddit</SelectItem>
                 <SelectItem value="threads">Threads</SelectItem>
+                <SelectItem value="hackernews">Hacker News</SelectItem>
+                <SelectItem value="x">X / Twitter</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
-          <div className="space-y-2">
-            <div className="flex justify-between text-xs font-medium text-muted-foreground">
-              <span>Min Intent Score</span>
-              <span>{minScore}%</span>
-            </div>
-            <Slider
-              value={[minScore]}
-              onValueChange={(v) => setMinScore(v[0])}
-              min={10}
-              max={90}
-              step={5}
-            />
-          </div>
-        </div>
-
-        {(q || minScore > 40 || platform !== "all") && (
-          <div className="flex items-center gap-2 border-t border-border pt-4 text-sm text-muted-foreground">
+          <div className="flex items-center justify-end">
             <Button
-              variant="ghost"
+              variant="outline"
               size="sm"
               onClick={() => {
                 setQ("");
-                setMinScore(40);
+                setMinScore(0);
                 setPlatform("all");
               }}
-              className="h-8 text-xs text-muted-foreground hover:text-foreground"
+              className="text-xs gap-1.5"
             >
-              <FilterX className="h-3 w-3 mr-1.5" />
-              Reset filters
+              <FilterX className="h-3.5 w-3.5" /> Clear Filters
             </Button>
           </div>
-        )}
-      </Card>
+        </div>
 
-      {/* List Container */}
-      <Card className="overflow-hidden">
+        {/* Results List */}
         {isLoading ? (
-          <div className="p-12 text-center text-muted-foreground">
-            <div className="h-6 w-6 border-2 border-violet-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-            Loading intent signals...
+          <div className="py-12 text-center text-muted-foreground">
+            <div className="animate-spin h-8 w-8 border-4 border-orange-500 border-t-transparent rounded-full mx-auto mb-4" />
+            <p className="text-sm font-medium">Loading intent signals...</p>
           </div>
         ) : filtered.length === 0 ? (
-          <div className="p-12 text-center text-muted-foreground space-y-2">
+          <div className="py-12 text-center space-y-2">
             <div>No matching intent signals found.</div>
-            <p className="text-xs text-muted-foreground/60 max-w-sm mx-auto">
-              Try adjusting your query or launching a new "Buying Intent Discovery" search from the
-              search dashboard.
-            </p>
           </div>
         ) : (
           <div className="divide-y divide-border">
@@ -251,19 +223,14 @@ function IntentLeadsDashboard() {
                 ? new Date(lead.post_created_at).toLocaleDateString()
                 : "Unknown date";
               return (
-                <div
-                  key={lead.id}
-                  className="p-5 hover:bg-card/40 transition-colors flex flex-col gap-4"
-                >
+                <div key={lead.id} className="p-5 hover:bg-card/40 transition-colors flex flex-col gap-4">
                   <div className="flex items-start justify-between gap-4">
                     <div className="space-y-1.5">
                       <div className="flex items-center flex-wrap gap-2">
                         <Badge variant="outline" className="border-orange-500/20 text-orange-400 bg-orange-500/5">
                           {lead.matched_keyword || "hiring"}
                         </Badge>
-                        <Badge variant="secondary" className="text-xs font-normal">
-                          {lead.source_platform || "Reddit"}
-                        </Badge>
+                        <AISourceBadge source={lead.source_platform || "Reddit"} sourceUrl={lead.post_url} />
                         <IntentScoreBadge score={lead.intent_score || 0} />
                       </div>
                       <h2 className="text-base font-semibold tracking-tight text-foreground line-clamp-2">
@@ -272,6 +239,13 @@ function IntentLeadsDashboard() {
                     </div>
 
                     <div className="flex items-center gap-2">
+                      <Button
+                        size="sm"
+                        onClick={() => setAiLead(lead)}
+                        className="h-8 bg-orange-500/10 text-orange-400 border border-orange-500/20 hover:bg-orange-500/20 text-xs gap-1"
+                      >
+                        <Brain className="h-3.5 w-3.5" /> AI Findings
+                      </Button>
                       {lead.post_url && (
                         <Button asChild size="sm" variant="outline" className="h-8">
                           <a
@@ -280,7 +254,7 @@ function IntentLeadsDashboard() {
                             rel="noopener noreferrer"
                             className="inline-flex items-center gap-1 text-xs"
                           >
-                            Original Post <ArrowUpRight className="h-3 w-3" />
+                            Post <ArrowUpRight className="h-3 w-3" />
                           </a>
                         </Button>
                       )}
@@ -290,27 +264,20 @@ function IntentLeadsDashboard() {
                         className="h-8 w-8 p-0"
                         onClick={() => toggleExpand(lead.id)}
                       >
-                        {isExpanded ? (
-                          <ChevronUp className="h-4 w-4" />
-                        ) : (
-                          <ChevronDown className="h-4 w-4" />
-                        )}
+                        {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                       </Button>
                     </div>
                   </div>
 
                   <div className="flex items-center gap-4 text-xs text-muted-foreground font-mono">
                     <span className="flex items-center gap-1">
-                      <User className="h-3.5 w-3.5" />
-                      {lead.post_author || "Anonymous"}
+                      <User className="h-3.5 w-3.5" /> {lead.post_author || "Anonymous"}
                     </span>
                     <span className="flex items-center gap-1">
-                      <Calendar className="h-3.5 w-3.5" />
-                      {postDate}
+                      <Calendar className="h-3.5 w-3.5" /> {postDate}
                     </span>
                   </div>
 
-                  {/* Body Snippet */}
                   <div
                     className={`text-sm text-muted-foreground bg-muted/30 border border-border/50 rounded-lg p-4 font-sans leading-relaxed transition-all ${
                       isExpanded ? "line-clamp-none block" : "line-clamp-2"
@@ -324,6 +291,15 @@ function IntentLeadsDashboard() {
           </div>
         )}
       </Card>
+
+      {/* AI Intelligence Drawer */}
+      {aiLead && (
+        <AIIntelligenceDrawer
+          open={!!aiLead}
+          onOpenChange={(open) => !open && setAiLead(null)}
+          lead={aiLead}
+        />
+      )}
     </div>
   );
 }

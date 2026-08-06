@@ -194,8 +194,8 @@ export const fetchRedditSubPosts = createServerFn({ method: "GET" })
     if (isSubreddit) {
       const targetSub = sanitizedSub.toLowerCase();
       const rssUrls = [
-        `https://www.reddit.com/r/${targetSub}/hot.rss`,
-        `https://www.reddit.com/r/${targetSub}/.rss`
+        `https://www.reddit.com/r/${targetSub}/hot.rss?limit=100`,
+        `https://www.reddit.com/r/${targetSub}/.rss?limit=100`
       ];
 
       for (const rssUrl of rssUrls) {
@@ -214,7 +214,7 @@ export const fetchRedditSubPosts = createServerFn({ method: "GET" })
 
         // RSS Bridge Fallback for Subreddit
         try {
-          const bridgeUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rssUrl)}`;
+          const bridgeUrl = `https://api.rss2json.com/v1/api.json?count=100&rss_url=${encodeURIComponent(rssUrl)}`;
           const bridgeRes = await fetch(bridgeUrl);
           if (bridgeRes.ok) {
             const json = await bridgeRes.json();
@@ -237,7 +237,7 @@ export const fetchRedditSubPosts = createServerFn({ method: "GET" })
     debugLog.push(`[${new Date().toLocaleTimeString()}] Keyword terms to search: ${searchTerms.join(", ")}`);
 
     for (const term of searchTerms) {
-      const searchRssUrl = `https://www.reddit.com/search.rss?q=${encodeURIComponent(term)}&sort=new`;
+      const searchRssUrl = `https://www.reddit.com/search.rss?q=${encodeURIComponent(term)}&sort=new&limit=100`;
       
       // Attempt 1: Direct Search RSS
       try {
@@ -255,7 +255,7 @@ export const fetchRedditSubPosts = createServerFn({ method: "GET" })
 
       // Attempt 2: Bridge Search RSS
       try {
-        const bridgeUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(searchRssUrl)}`;
+        const bridgeUrl = `https://api.rss2json.com/v1/api.json?count=100&rss_url=${encodeURIComponent(searchRssUrl)}`;
         debugLog.push(`[${new Date().toLocaleTimeString()}] Bridge Fetching Search RSS: ${bridgeUrl}`);
         const bridgeRes = await fetch(bridgeUrl);
         if (bridgeRes.ok) {

@@ -1,5 +1,5 @@
 import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
-import { LayoutDashboard, Search, Database, History, FolderKanban, FileDown, Settings, LogOut, MapPin, Sparkles, Shield, Users, Coins, Activity, Wifi, ArrowLeft, BarChart3, MessageSquare } from "lucide-react";
+import { LayoutDashboard, Search, Database, History, FolderKanban, FileDown, Settings, LogOut, MapPin, Sparkles, Shield, Users, Coins, Activity, Wifi, ArrowLeft, BarChart3, MessageSquare, Ship } from "lucide-react";
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel,
   SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarHeader, SidebarFooter, useSidebar,
@@ -16,6 +16,7 @@ const userItems = [
   { title: "Directory Agent", url: "/directory",     icon: MapPin },
   { title: "All Leads",       url: "/results",       icon: Database },
   { title: "Intent Leads",    url: "/intent-leads",  icon: Sparkles },
+  { title: "Import & Export", url: "/trade-data",    icon: Ship },
   { title: "Reddit Posts",    url: "/reddit-posts",  icon: MessageSquare },
   { title: "History",         url: "/history",       icon: History },
   { title: "Projects",        url: "/projects",      icon: FolderKanban },

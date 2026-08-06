@@ -24,6 +24,7 @@ import { Route as AuthenticatedRedditPostsRouteImport } from './routes/_authenti
 import { Route as AuthenticatedResultsRouteImport } from './routes/_authenticated/results'
 import { Route as AuthenticatedSearchRouteImport } from './routes/_authenticated/search'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
+import { Route as AuthenticatedTradeDataRouteImport } from './routes/_authenticated/trade-data'
 import { Route as AuthenticatedSearchIndexRouteImport } from './routes/_authenticated/search.index'
 import { Route as AuthenticatedSearchIdRouteImport } from './routes/_authenticated/search.$id'
 import { Route as AuthThreadsCallbackRouteImport } from './routes/auth.threads.callback'
@@ -104,6 +105,11 @@ const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedTradeDataRoute = AuthenticatedTradeDataRouteImport.update({
+  id: '/trade-data',
+  path: '/trade-data',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedSearchIndexRoute =
   AuthenticatedSearchIndexRouteImport.update({
     id: '/',
@@ -136,6 +142,7 @@ export interface FileRoutesByFullPath {
   '/results': typeof AuthenticatedResultsRoute
   '/search': typeof AuthenticatedSearchRouteWithChildren
   '/settings': typeof AuthenticatedSettingsRoute
+  '/trade-data': typeof AuthenticatedTradeDataRoute
   '/search/$id': typeof AuthenticatedSearchIdRoute
   '/auth/threads/callback': typeof AuthThreadsCallbackRoute
   '/search/': typeof AuthenticatedSearchIndexRoute
@@ -154,6 +161,7 @@ export interface FileRoutesByTo {
   '/reddit-posts': typeof AuthenticatedRedditPostsRoute
   '/results': typeof AuthenticatedResultsRoute
   '/settings': typeof AuthenticatedSettingsRoute
+  '/trade-data': typeof AuthenticatedTradeDataRoute
   '/search/$id': typeof AuthenticatedSearchIdRoute
   '/auth/threads/callback': typeof AuthThreadsCallbackRoute
   '/search': typeof AuthenticatedSearchIndexRoute
@@ -175,6 +183,7 @@ export interface FileRoutesById {
   '/_authenticated/results': typeof AuthenticatedResultsRoute
   '/_authenticated/search': typeof AuthenticatedSearchRouteWithChildren
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
+  '/_authenticated/trade-data': typeof AuthenticatedTradeDataRoute
   '/_authenticated/search/$id': typeof AuthenticatedSearchIdRoute
   '/auth/threads/callback': typeof AuthThreadsCallbackRoute
   '/_authenticated/search/': typeof AuthenticatedSearchIndexRoute
@@ -196,6 +205,7 @@ export interface FileRouteTypes {
     | '/results'
     | '/search'
     | '/settings'
+    | '/trade-data'
     | '/search/$id'
     | '/auth/threads/callback'
     | '/search/'
@@ -214,6 +224,7 @@ export interface FileRouteTypes {
     | '/reddit-posts'
     | '/results'
     | '/settings'
+    | '/trade-data'
     | '/search/$id'
     | '/auth/threads/callback'
     | '/search'
@@ -234,6 +245,7 @@ export interface FileRouteTypes {
     | '/_authenticated/results'
     | '/_authenticated/search'
     | '/_authenticated/settings'
+    | '/_authenticated/trade-data'
     | '/_authenticated/search/$id'
     | '/auth/threads/callback'
     | '/_authenticated/search/'
@@ -353,6 +365,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSettingsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/trade-data': {
+      id: '/_authenticated/trade-data'
+      path: '/trade-data'
+      fullPath: '/trade-data'
+      preLoaderRoute: typeof AuthenticatedTradeDataRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/search/': {
       id: '/_authenticated/search/'
       path: '/'
@@ -402,6 +421,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedResultsRoute: typeof AuthenticatedResultsRoute
   AuthenticatedSearchRoute: typeof AuthenticatedSearchRouteWithChildren
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
+  AuthenticatedTradeDataRoute: typeof AuthenticatedTradeDataRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
@@ -416,6 +436,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedResultsRoute: AuthenticatedResultsRoute,
   AuthenticatedSearchRoute: AuthenticatedSearchRouteWithChildren,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
+  AuthenticatedTradeDataRoute: AuthenticatedTradeDataRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =

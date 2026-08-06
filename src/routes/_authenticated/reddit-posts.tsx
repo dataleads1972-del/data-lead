@@ -1,56 +1,77 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
 import { fetchRedditSubPosts } from "@/lib/reddit.functions";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { MessageSquare, RefreshCw, ExternalLink, AlertCircle, Loader2, Terminal, Bug, Search, Sparkles } from "lucide-react";
+import { AIIntelligenceDrawer } from "@/components/AIIntelligenceDrawer";
+import {
+  Search,
+  MessageSquare,
+  Sparkles,
+  ExternalLink,
+  Brain,
+  AlertCircle,
+  ChevronLeft,
+  ChevronRight,
+  Terminal,
+  Flame,
+} from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/reddit-posts")({
   head: () => ({
     meta: [
-      { title: "Reddit Posts & Intent Leads — LeadAI" },
-      { name: "description", content: "Search real public Reddit posts and buying intent signals." }
-    ]
+      { title: "Reddit Buying Intent Search — LeadAI" },
+      { name: "description", content: "Search real Reddit posts and extract commercial buying signals." },
+    ],
   }),
   component: RedditPostsPage,
 });
 
 interface RedditPost {
   id: string;
-  subreddit: string;
   title: string;
-  body: string;
+  content: string;
   author: string;
-  createdAt?: string;
-  score?: number;
+  subreddit: string;
+  score: number;
   commentCount?: number;
   permalink: string;
   url: string;
 }
 
 function RedditPostsPage() {
-  const [searchInput, setSearchInput] = useState("r/startups");
-  const [currentQuery, setCurrentQuery] = useState("startups");
-  const [searchType, setSearchType] = useState<"subreddit" | "keyword">("subreddit");
+  const [searchInput, setSearchInput] = useState("");
+  const [currentQuery, setCurrentQuery] = useState("");
+  const [searchType, setSearchType] = useState<"subreddit" | "keyword">("keyword");
   const [posts, setPosts] = useState<RedditPost[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
-  // Debug Console state (hidden by default)
+  // Pagination State (10 items per page)
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+
+  // AI Drawer state
+  const [aiPostRecord, setAiPostRecord] = useState<any | null>(null);
+
+  // Debug Console state
   const [showDebug, setShowDebug] = useState(false);
-  const [debugLogs, setDebugLogs] = useState<string[]>(["System initialized. Ready to fetch posts."]);
+  const [debugLogs, setDebugLogs] = useState<string[]>(["System initialized. Ready to search buying intent."]);
 
   const loadPosts = async (queryStr: string) => {
-    setLoading(true);
-    setError(null);
-
     const trimmed = queryStr.trim();
     if (!trimmed) {
-      setLoading(false);
+      toast.error("Please enter a search keyword or subreddit.");
       return;
     }
+
+    setLoading(true);
+    setError(null);
+    setCurrentPage(1);
 
     setDebugLogs((prev) => [
       `[${new Date().toLocaleTimeString()}] Triggered loadPosts for: "${trimmed}"`,
@@ -61,20 +82,19 @@ function RedditPostsPage() {
       const data = await fetchRedditSubPosts({ data: { subreddit: trimmed } });
       const fetchedPosts = data?.posts || [];
       const logs = data?.debugLog || [];
-      const resSearchType = data?.searchType || "subreddit";
+      const resSearchType = data?.searchType || "keyword";
       const resQuery = data?.query || trimmed;
       
       setDebugLogs((prev) => [...logs, ...prev]);
       setPosts(fetchedPosts);
       setSearchType(resSearchType);
       setCurrentQuery(resQuery);
-      setSearchInput(resSearchType === "subreddit" ? `r/${resQuery}` : trimmed);
 
       if (fetchedPosts.length === 0) {
         setError(`No active posts found for "${trimmed}". Please try another search or subreddit.`);
         toast.info(`No active posts found for "${trimmed}"`);
       } else {
-        toast.success(`Loaded ${fetchedPosts.length} posts for "${trimmed}"`);
+        toast.success(`Loaded ${fetchedPosts.length} intent posts for "${trimmed}"`);
       }
     } catch (err: any) {
       console.error("Fetch error:", err);
@@ -91,16 +111,8 @@ function RedditPostsPage() {
     }
   };
 
-  useEffect(() => {
-    loadPosts("startups");
-  }, []);
-
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    loadPosts(searchInput);
-  };
-
-  const handleRefresh = () => {
     loadPosts(searchInput);
   };
 
@@ -109,250 +121,262 @@ function RedditPostsPage() {
     loadPosts(query);
   };
 
+  // Pagination Calculations
+  const totalPages = Math.ceil(posts.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = Math.min(startIndex + itemsPerPage, posts.length);
+  const paginatedPosts = posts.slice(startIndex, endIndex);
+
   return (
-    <div className="p-6 lg:p-10 max-w-5xl mx-auto space-y-6">
-      {/* Top Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-border/40 pb-6">
+    <div className="p-6 max-w-7xl mx-auto space-y-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border/60 pb-5">
         <div>
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-xl">🟧</span>
-            <h1 className="text-3xl font-bold tracking-tight">Reddit Posts & Intent Leads</h1>
+          <div className="flex items-center gap-2">
+            <span className="text-2xl">📑</span>
+            <h1 className="text-2xl font-bold tracking-tight">Reddit Buying Intent Search</h1>
           </div>
-          <p className="text-muted-foreground text-sm">
-            Search subreddits or query keywords like <code className="text-orange-400 bg-orange-500/10 px-1 rounded">"looking for a developer"</code> across Reddit
+          <p className="text-xs text-muted-foreground mt-1">
+            Search live Reddit discussions to extract software, agency, and vendor intent signals.
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => setShowDebug(!showDebug)}
-            className="h-8 gap-1.5 text-xs border-orange-500/30 text-orange-400 hover:bg-orange-500/10"
-          >
-            <Bug className="w-3.5 h-3.5" />
-            {showDebug ? "Hide Console" : "Show Console"}
-          </Button>
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-amber-500/10 text-amber-500 border border-amber-500/20">
-            <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse"></span>
-            Devvit Integration Active
-          </span>
-        </div>
+
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setShowDebug(!showDebug)}
+          className="text-xs gap-1.5 self-start sm:self-auto font-mono text-muted-foreground border-border/60"
+        >
+          <Terminal className="h-3.5 w-3.5 text-orange-400" />
+          {showDebug ? "Hide Diagnostics" : "Show Diagnostics"}
+        </Button>
       </div>
 
-      {/* Control / Search Card */}
-      <Card className="border-border/50 bg-card/60 backdrop-blur">
-        <CardContent className="pt-6 space-y-4">
-          <form onSubmit={handleSearch} className="flex flex-col sm:flex-row items-stretch gap-3">
-            <div className="relative flex-1">
-              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground select-none" />
-              <Input
-                type="text"
-                value={searchInput}
-                onChange={(e) => setSearchInput(e.target.value)}
-                placeholder='Enter subreddit (e.g. r/startups) or keyword (e.g. "looking for developer")'
-                className="pl-10 h-11 bg-background/80"
-                disabled={loading}
-              />
-            </div>
-            <div className="flex items-center gap-2">
-              <Button type="submit" disabled={loading} className="h-11 px-6 font-semibold bg-orange-600 hover:bg-orange-500 text-white">
-                {loading ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Searching...
-                  </>
-                ) : (
-                  <>
-                    <MessageSquare className="w-4 h-4 mr-2" />
-                    Search Posts
-                  </>
-                )}
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleRefresh}
-                disabled={loading}
-                className="h-11 px-4"
-              >
-                <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
-              </Button>
-            </div>
-          </form>
-
-          {/* Quick Suggestion Chips */}
-          <div className="flex items-center gap-2 flex-wrap pt-1 text-xs">
-            <span className="text-muted-foreground font-medium flex items-center gap-1">
-              <Sparkles className="w-3 h-3 text-orange-400" />
-              Try searches:
-            </span>
-            {[
-              "looking for a developer",
-              "need developer",
-              "hiring react dev",
-              "r/startups",
-              "r/SaaS",
-              "r/webdev"
-            ].map((chip) => {
-              const active = searchInput.toLowerCase() === chip.toLowerCase();
-              return (
-                <button
-                  key={chip}
-                  type="button"
-                  onClick={() => handleSuggestionClick(chip)}
-                  disabled={loading}
-                  className={`px-3 py-1 rounded-full transition-colors font-medium border ${
-                    active
-                      ? "bg-orange-500/20 text-orange-400 border-orange-500/40"
-                      : "bg-secondary/40 hover:bg-secondary/80 text-muted-foreground border-border/40"
-                  }`}
-                >
-                  {chip}
-                </button>
-              );
-            })}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Active Search Mode Badge */}
-      <div className="flex items-center justify-between text-xs px-1">
-        <div className="flex items-center gap-2">
-          {searchType === "keyword" ? (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md bg-blue-500/10 text-blue-400 border border-blue-500/20 font-medium">
-              <Search className="w-3.5 h-3.5" />
-              Keyword Search: "{currentQuery}"
-            </span>
-          ) : (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md bg-orange-500/10 text-orange-400 border border-orange-500/20 font-medium">
-              <MessageSquare className="w-3.5 h-3.5" />
-              Subreddit Feed: r/{currentQuery}
-            </span>
-          )}
-          {posts.length > 0 && (
-            <span className="text-muted-foreground">({posts.length} results)</span>
-          )}
-        </div>
-      </div>
-
-      {/* Optional Debug Console */}
+      {/* Diagnostics Panel */}
       {showDebug && (
-        <Card className="border-zinc-800 bg-zinc-950 text-zinc-200 font-mono text-xs shadow-xl">
-          <CardHeader className="py-3 px-4 border-b border-zinc-800 flex flex-row items-center justify-between">
-            <div className="flex items-center gap-2 text-zinc-400 font-semibold">
-              <Terminal className="w-4 h-4 text-emerald-400" />
-              <span>Browser & Server Diagnostics Console</span>
-            </div>
-            <button
-              onClick={() => setDebugLogs([`[${new Date().toLocaleTimeString()}] Console cleared.`])}
-              className="text-zinc-500 hover:text-zinc-300 text-[11px] underline"
-            >
-              Clear Logs
-            </button>
-          </CardHeader>
-          <CardContent className="p-4 max-h-48 overflow-y-auto space-y-1 select-text">
-            {debugLogs.map((log, index) => (
-              <div
-                key={index}
-                className={`leading-relaxed ${
-                  log.includes("Exception") || log.includes("failed") || log.includes("Error") || log.includes("429")
-                    ? "text-red-400 font-semibold"
-                    : log.includes("Successfully") || log.includes("200")
-                    ? "text-emerald-400 font-semibold"
-                    : "text-zinc-300"
-                }`}
-              >
-                {log}
-              </div>
+        <Card className="p-4 bg-black/80 border border-orange-500/30 text-emerald-400 font-mono text-xs space-y-2 rounded-xl">
+          <div className="flex items-center justify-between border-b border-white/10 pb-2 text-white font-semibold">
+            <span>Diagnostics Console</span>
+            <Badge variant="outline" className="text-[10px] border-emerald-500/40 text-emerald-400">
+              Active Connection
+            </Badge>
+          </div>
+          <div className="max-h-40 overflow-y-auto space-y-1 text-[11px] leading-relaxed">
+            {debugLogs.map((log, i) => (
+              <div key={i} className="whitespace-pre-wrap">{log}</div>
             ))}
-          </CardContent>
+          </div>
         </Card>
+      )}
+
+      {/* Search Bar & Preset Chips */}
+      <div className="space-y-3">
+        <form onSubmit={handleSearch} className="flex gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              placeholder="Search keyword or subreddit (e.g. looking for CRM, recommend agency, r/SaaS)..."
+              className="pl-10 h-11 bg-card text-sm rounded-xl border-border/60 focus:border-orange-500"
+            />
+          </div>
+          <Button
+            type="submit"
+            disabled={loading}
+            className="h-11 px-6 bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white font-semibold rounded-xl gap-2 shadow-md shadow-orange-500/20"
+          >
+            {loading ? <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" /> : <Search className="h-4 w-4" />}
+            {loading ? "Searching..." : "Search Posts"}
+          </Button>
+        </form>
+
+        {/* Popular Intent Signal Preset Chips */}
+        <div className="flex items-center gap-2 flex-wrap text-xs text-muted-foreground">
+          <span className="font-medium text-[11px] tracking-wider uppercase">Popular Intent Signals:</span>
+          {["looking for CRM", "recommend software agency", "r/SaaS", "HubSpot alternative", "r/startups"].map((chip) => (
+            <Badge
+              key={chip}
+              variant="secondary"
+              onClick={() => handleSuggestionClick(chip)}
+              className="cursor-pointer hover:bg-orange-500/20 hover:text-orange-400 hover:border-orange-500/30 transition-all text-xs font-normal border border-border/40 py-1 px-2.5 rounded-lg"
+            >
+              {chip}
+            </Badge>
+          ))}
+        </div>
+      </div>
+
+      {/* Default Clean State (When no search has been performed yet) */}
+      {!currentQuery && !loading && (
+        <Card className="p-12 text-center space-y-4 border border-dashed border-orange-500/20 bg-card/40 rounded-2xl">
+          <div className="h-12 w-12 rounded-2xl bg-orange-500/10 border border-orange-500/20 flex items-center justify-center mx-auto">
+            <Search className="h-6 w-6 text-orange-400" />
+          </div>
+          <div className="space-y-1">
+            <h3 className="font-bold text-base text-foreground">Ready to Search Buying Intent Signals</h3>
+            <p className="text-xs text-muted-foreground max-w-md mx-auto leading-relaxed">
+              Type a software search term or click any popular intent chip above (such as <span className="text-orange-400 font-medium">"looking for CRM"</span> or <span className="text-orange-400 font-medium">"r/SaaS"</span>) to retrieve up to 100 posts with 10 items per page.
+            </p>
+          </div>
+        </Card>
+      )}
+
+      {/* Loading Skeleton */}
+      {loading && (
+        <div className="grid gap-4 md:grid-cols-2">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <Card key={i} className="p-5 space-y-3 animate-pulse border-border/40 bg-card/60 rounded-xl">
+              <div className="h-4 bg-secondary/80 rounded w-1/3" />
+              <div className="h-5 bg-secondary rounded w-4/5" />
+              <div className="h-12 bg-secondary/40 rounded w-full" />
+            </Card>
+          ))}
+        </div>
       )}
 
       {/* Error Message */}
-      {error && (
-        <Card className="border-red-500/40 bg-red-500/10">
-          <CardContent className="pt-6 flex items-center gap-3 text-red-400">
-            <AlertCircle className="w-5 h-5 shrink-0" />
-            <div>
-              <p className="font-semibold">Unable to fetch posts</p>
-              <p className="text-xs opacity-90">{error}</p>
-            </div>
-          </CardContent>
+      {error && !loading && (
+        <Card className="p-4 bg-red-500/10 border border-red-500/20 text-red-400 text-xs rounded-xl flex items-center gap-2">
+          <AlertCircle className="h-4 w-4 shrink-0" />
+          <span>{error}</span>
         </Card>
       )}
 
-      {/* Posts Section */}
-      {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {[...Array(4)].map((_, i) => (
-            <Card key={i} className="border-border/40 bg-card/40 animate-pulse">
-              <CardHeader className="pb-2">
-                <div className="h-4 bg-secondary/80 rounded w-1/4 mb-2"></div>
-                <div className="h-5 bg-secondary rounded w-3/4"></div>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                <div className="h-3 bg-secondary/60 rounded w-full"></div>
-                <div className="h-3 bg-secondary/60 rounded w-5/6"></div>
-                <div className="h-3 bg-secondary/60 rounded w-2/3"></div>
-              </CardContent>
-            </Card>
-          ))}
+      {/* Results Header */}
+      {currentQuery && !loading && posts.length > 0 && (
+        <div className="flex items-center justify-between text-xs text-muted-foreground pt-2">
+          <span>
+            Found <strong className="text-foreground">{posts.length}</strong> posts for <strong className="text-orange-400">"{currentQuery}"</strong> • Showing page <strong className="text-foreground">{currentPage}</strong> of <strong className="text-foreground">{totalPages}</strong>
+          </span>
+          <Badge variant="outline" className="text-[10px] border-orange-500/30 text-orange-400">
+            {searchType === "subreddit" ? "Subreddit Mode" : "Global Keyword Search"}
+          </Badge>
         </div>
-      ) : posts.length === 0 && !error ? (
-        <Card className="border-dashed border-border/60 bg-card/30 py-12 text-center">
-          <CardContent className="space-y-3">
-            <MessageSquare className="w-10 h-10 mx-auto text-muted-foreground/40" />
-            <h3 className="text-lg font-semibold">No posts found for "{currentQuery}"</h3>
-            <p className="text-sm text-muted-foreground max-w-sm mx-auto">
-              Try typing a keyword like "looking for developer" or a subreddit like "r/startups".
-            </p>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {posts.map((post) => (
-            <Card key={post.id} className="border-border/50 bg-card/60 hover:border-orange-500/40 transition-colors flex flex-col justify-between">
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between text-xs text-muted-foreground mb-1.5">
-                  <span className="font-semibold text-orange-400">r/{post.subreddit}</span>
-                  {post.author && (
-                    <span>u/{post.author}</span>
-                  )}
-                </div>
-                <CardTitle className="text-base font-semibold leading-snug line-clamp-2">
-                  {post.title}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {post.body && (
-                  <p className="text-xs text-muted-foreground line-clamp-3 leading-relaxed">
-                    {post.body}
-                  </p>
-                )}
-                <div className="flex items-center justify-between pt-2 border-t border-border/30 text-xs">
-                  <div className="flex items-center gap-3 text-muted-foreground">
-                    {post.createdAt && (
-                      <span>{new Date(post.createdAt).toLocaleDateString()}</span>
-                    )}
+      )}
+
+      {/* Posts Grid (Page-wise 10 items) */}
+      {!loading && posts.length > 0 && (
+        <div className="space-y-6">
+          <div className="grid gap-4 md:grid-cols-2">
+            {paginatedPosts.map((post) => (
+              <Card key={post.id} className="p-5 flex flex-col justify-between hover:border-orange-500/40 transition-all bg-card/80 backdrop-blur border border-border/60 rounded-2xl shadow-sm space-y-4">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-xs text-muted-foreground gap-2">
+                    <span className="font-semibold text-orange-400 bg-orange-500/10 px-2 py-0.5 rounded border border-orange-500/20">
+                      r/{post.subreddit}
+                    </span>
+                    <span className="truncate">u/{post.author}</span>
                   </div>
-                  {post.permalink && (
-                    <a
-                      href={post.permalink}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 text-orange-400 hover:text-orange-300 font-medium text-xs hover:underline"
-                    >
-                      View on Reddit
-                      <ExternalLink className="w-3 h-3" />
-                    </a>
+                  
+                  <h3 className="font-bold text-foreground text-sm leading-snug hover:text-orange-400 transition-colors">
+                    {post.title}
+                  </h3>
+
+                  {post.content && (
+                    <p className="text-xs text-muted-foreground line-clamp-3 leading-relaxed bg-secondary/30 p-2.5 rounded-lg border border-border/40">
+                      {post.content}
+                    </p>
                   )}
                 </div>
-              </CardContent>
-            </Card>
-          ))}
+
+                <div className="flex items-center justify-between pt-3 border-t border-border/40 text-xs">
+                  <a
+                    href={`https://reddit.com${post.permalink}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-muted-foreground hover:text-foreground flex items-center gap-1 text-[11px] font-medium"
+                  >
+                    <ExternalLink className="h-3 w-3" /> View on Reddit
+                  </a>
+
+                  <Button
+                    size="sm"
+                    onClick={() => setAiPostRecord({
+                      id: post.id,
+                      source: "reddit",
+                      recordType: "post",
+                      title: post.title,
+                      content: post.content || post.title,
+                      author: post.author,
+                      sourceUrl: `https://reddit.com${post.permalink}`,
+                      metadata: { subreddit: post.subreddit, score: post.score },
+                    })}
+                    className="bg-orange-500/10 hover:bg-orange-500/20 text-orange-400 border border-orange-500/30 text-xs font-semibold gap-1.5 h-8"
+                  >
+                    <Brain className="h-3.5 w-3.5" /> Analyze with AI
+                  </Button>
+                </div>
+              </Card>
+            ))}
+          </div>
+
+          {/* PAGE-WISE PAGINATION BAR */}
+          {totalPages > 1 && (
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 rounded-2xl bg-card border border-border/60 shadow-sm">
+              <div className="text-xs text-muted-foreground font-medium">
+                Showing <strong className="text-foreground">{startIndex + 1}</strong> to <strong className="text-foreground">{endIndex}</strong> of <strong className="text-orange-400">{posts.length}</strong> posts
+              </div>
+
+              <div className="flex items-center gap-1.5">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={currentPage === 1}
+                  onClick={() => {
+                    setCurrentPage((p) => Math.max(1, p - 1));
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                  }}
+                  className="h-8 text-xs gap-1 px-2.5"
+                >
+                  <ChevronLeft className="h-3.5 w-3.5" /> Prev
+                </Button>
+
+                {/* Page Number Buttons */}
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
+                    <Button
+                      key={pageNum}
+                      size="sm"
+                      variant={currentPage === pageNum ? "default" : "outline"}
+                      onClick={() => {
+                        setCurrentPage(pageNum);
+                        window.scrollTo({ top: 0, behavior: "smooth" });
+                      }}
+                      className={`h-8 w-8 text-xs p-0 font-mono ${
+                        currentPage === pageNum ? "bg-orange-500 text-white hover:bg-orange-600 font-bold" : "text-muted-foreground"
+                      }`}
+                    >
+                      {pageNum}
+                    </Button>
+                  ))}
+                </div>
+
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={currentPage === totalPages}
+                  onClick={() => {
+                    setCurrentPage((p) => Math.min(totalPages, p + 1));
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                  }}
+                  className="h-8 text-xs gap-1 px-2.5"
+                >
+                  Next <ChevronRight className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
+      )}
+
+      {/* AI Intelligence Drawer Component */}
+      {aiPostRecord && (
+        <AIIntelligenceDrawer
+          open={!!aiPostRecord}
+          onOpenChange={(open) => !open && setAiPostRecord(null)}
+          rawRecord={aiPostRecord}
+        />
       )}
     </div>
   );
