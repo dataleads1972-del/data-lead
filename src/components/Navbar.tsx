@@ -8,8 +8,8 @@ export function Navbar() {
   const [open, setOpen] = useState(false);
 
   return (
-    <nav className="animate-fade-down relative z-20">
-      <div className="flex items-center justify-between px-5 sm:px-8 lg:px-10 py-4 sm:py-5">
+    <nav className="fixed top-0 left-0 right-0 z-50 transition-all duration-300 bg-white/80 backdrop-blur-xl border-b border-gray-200/60 shadow-2xs">
+      <div className="flex items-center justify-between px-5 sm:px-8 lg:px-10 py-3.5 sm:py-4">
         <a href="/" className="flex items-center gap-2 text-gray-900">
           <Logo className="w-5 h-5 sm:w-6 sm:h-6" />
           <span className="text-[15px] font-medium tracking-tight">Leadly</span>

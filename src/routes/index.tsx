@@ -2,9 +2,11 @@ import { createFileRoute } from "@tanstack/react-router";
 import { Hero } from "@/components/Hero";
 import { Stats } from "@/components/landing/Stats";
 import { Features } from "@/components/landing/Features";
+import { LivePlayground } from "@/components/landing/LivePlayground";
 import { HowItWorks } from "@/components/landing/HowItWorks";
 import { Pricing } from "@/components/landing/Pricing";
 import { FAQ } from "@/components/landing/FAQ";
+import { MovingFeatures } from "@/components/landing/MovingFeatures";
 import { CTAFooter } from "@/components/landing/CTAFooter";
 
 export const Route = createFileRoute("/")({
@@ -35,10 +37,14 @@ function Index() {
       <Hero />
       <Stats />
       <Features />
+      <LivePlayground />
       <HowItWorks />
       <Pricing />
       <FAQ />
+      <MovingFeatures />
       <CTAFooter />
     </main>
   );
 }
+
+

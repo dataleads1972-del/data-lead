@@ -11,7 +11,7 @@ export function Hero() {
   return (
     <section
       style={{ backgroundImage: `url(${BG})` }}
-      className="relative min-h-[100svh] overflow-hidden bg-cover bg-center flex flex-col"
+      className="relative min-h-[100svh] overflow-hidden bg-cover bg-center flex flex-col pt-20 sm:pt-24"
     >
       <Navbar />
 
